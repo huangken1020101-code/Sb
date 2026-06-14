@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=none">
+    <title>長頸鹿惡夢 II：戰術道具迷宮</title>
+    <style>
+        * { box-sizing: border-box; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+        body {
+            margin: 0; padding: 0; background-color: #050505; color: #fff;
+            font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center;
+            height: 100vh; overflow: hidden;
+        }
+        #gameWrapper {
+            position: relative; width: 100%; height: 100%; max-width: 800px; max-height: 600px;
+            aspect-ratio: 4/3; background: #000; box-shadow: 0 0 35px rgba(0,0,0,1);
+        }
+        /* 主首頁 */
+        #mainMenu {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(0,0,0,0.65), rgba(0,0,0,0.95)), url('https://images.unsplash.com/photo-1578328819058-b69f3a3b0f6b?q=80&w=600') center/cover;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10;
+        }
+        #mainMenu h1 { font-size: 1.8rem; color: #ff9800; text-shadow: 0 0 15px rgba(255,152,0,0.6); margin-bottom: 5px; text-align: center; }
+        #mainMenu p { font-size: 0.85rem; color: #bbb; margin-bottom: 20px; text-align: center; padding: 0 20px; line-height: 1.5; }
+        .btn {
+            padding: 12px 40px; font-size: 1.1rem; font-weight: bold; background: #b71c1c;
+            color: white; border: none; border-radius: 25px; cursor: pointer; transition: 0.2s;
+            box-shadow: 0 4px 15px rgba(183,28,28,0.4);
+        }
+        .btn:hover { background: #d32f2f; transform: scale(1.05); }
+        
+        /* UI 顯示 */
+        canvas { width: 100%; height: 100%; display: block; }
+        #ui {
+            position: absolute; top: 15px; left: 15px; font-size: 13px; font-weight: bold;
+            background: rgba(10,10,10,0.9); padding: 12px 16px; border-radius: 8px; 
+            border: 1px solid #444; pointer-events: none; z-index: 2; line-height: 1.6;
+        }
+        #warningUI {
+            position: absolute; top: 15px; right: 15px; font-size: 15px; font-weight: bold;
+            background: rgba(244,67,54,0.9); padding: 8px 12px; border-radius: 6px;
+            display: none; color: white; animation: blink 1s infinite; z-index: 2;
+        }
+        #messageScreen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.92); display: none; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 5;
+        }
+        #messageText { font-size: 2rem; font-weight: bold; margin-bottom: 25px; text-align: center; padding: 0 10px; }
+
+        /* 手機虛擬搖桿與道具鈕 */
+        #joystickContainer {
+            position: absolute; bottom: 20px; left: 20px; width: 110px; height: 110px;
+            background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 50%; display: none; touch-action: none; z-index: 3;
+        }
+        #joystickStick {
+            position: absolute; top: 38px; left: 38px; width: 34px; height: 34px;
+            background: rgba(255,255,255,0.6); border-radius: 50%;
+        }
+        #useItemBtn {
+            position: absolute; bottom: 30px; right: 30px; width: 75px; height: 75px;
+            background: #ff9800; color: white; border: none; border-radius: 50%;
+            font-weight: bold; font-size: 14px; display: none; z-index: 3;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6); text-align: center; line-height: 1.2;
+        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    </style>
+</head>
+<body>
+
+    <div id="gameWrapper">
+        <div id="mainMenu">
+            <h1>長頸鹿惡夢 II：戰術道具版</h1>
+            <p>🚪 門位校正：所有房間、防線隔離門已全面優化對齊，絕不卡牆！<br>🎒 搜集平板：背包滿載 2 台時需回中央藍圈繳回，集滿 8 台即可通關。<br>⚡ 戰術道具：地圖散落補給箱，按【空白鍵 / E】或【手機按鈕】拋出反制長頸鹿！</p>
+            <button class="btn" onclick="startGame()">進入實驗室</button>
+        </div>
+
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="ui">
+            <div id="carryUI" style="color: #ffeb3b;">🎒 背包容量: 0 / 2</div>
+            <div style="color: #a7ffeb;">📱 剩餘平板: <span id="remainingCount">8</span></div>
+            <div style="color: #00e5ff;">🔵 已繳回中心: <span id="deliveredCount">0</span> / 8</div>
+            <div id="itemUI" style="color: #ff9800; border-top: 1px solid #333; margin-top: 5px; padding-top: 5px;">📦 攜帶道具: 無</div>
+            <div id="statusUI" style="color: #ff5722; font-size: 11px; margin-top: 4px;">🦒 長頸鹿狀態: 巡邏中</div>
+        </div>
+
+        <div id="warningUI">🎒 背包已滿！請先回中心放平板！</div>
+
+        <div id="messageScreen">
+            <div id="messageText">遊戲結束</div>
+            <button class="btn" onclick="backToMenu()">返回主選單</button>
+        </div>
+
+        <div id="joystickContainer"><div id="joystickStick"></div></div>
+        <button id="useItemBtn" onclick="useCurrentItem()">使用<br>道具</button>
+    </div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const mainMenu = document.getElementById('mainMenu');
+const messageScreen = document.getElementById('messageScreen');
+const messageText = document.getElementById('messageText');
+const joystickContainer = document.getElementById('joystickContainer');
+const joystickStick = document.getElementById('joystickStick');
+const useItemBtn = document.getElementById('useItemBtn');
+
+const carryUI = document.getElementById('carryUI');
+const warningUI = document.getElementById('warningUI');
+const remainingCountUI = document.getElementById('remainingCount');
+const deliveredCountUI = document.getElementById('deliveredCount');
+const itemUI = document.getElementById('itemUI');
+const statusUI = document.getElementById('statusUI');
+
+const TILE_SIZE = 50;
+
+// 41x31 校正版無誤門位迷宮 (1=牆壁, 0=通道, 2=防門(閉), 3=防門(開))
+const mapTemplate = [
+    "11111111111111111111111111111111111111111", // 0
+    "10000000100000001000000010000000100000001", // 1
+    "10110110101101101011011010110110101101101", // 2
+    "10100010101000101010001010100010101000101", // 3
+    "10100010101000101010001010100010101000101", // 4
+    "10110110101101101011011010110110101101101", // 5
+    "10000000100000001000000010000000100000001", // 6
+    "11112111111121111111211111112111111121111", // 7  (上排五個走廊房門)
+    "10000000000000000000000000000000000000001", // 8
+    "10111110011111100000000000111111001111101", // 9  (中央上走廊掩體牆)
+    "10000000000000000000000000000000000000001", // 10
+    "11112111111121111000000011112111111121111", // 11 (走廊防線隔離門 - 已精準前後留白)
+    "10000000000000000000000000000000000000001", // 12
+    "10000000000000000000000000000000000000001", // 13
+    "11111111111111111110001111111111111111111", // 14 (核心基地北牆)
+    "10000000000000000000000000000000000000001", // 15 (核心中央線)
+    "11111111111111111110001111111111111111111", // 16 (核心基地南牆)
+    "10000000000000000000000000000000000000001", // 17
+    "10000000000000000000000000000000000000001", // 18
+    "11112111111121111000000011112111111121111", // 19 (走廊防線隔離門)
+    "10000000000000000000000000000000000000001", // 20
+    "10111110011111100000000000111111001111101", // 21 (中央下走廊掩體牆)
+    "10000000000000000000000000000000000000001", // 22
+    "11112111111121111111211111112111111121111", // 23 (下排五個走廊房門)
+    "10000000100000001000000010000000100000001", // 24
+    "10110110101101101011011010110110101101101", // 25
+    "10100010101000101010001010100010101000101", // 26
+    "10100010101000101010001010100010101000101", // 27
+    "10110110101101101011011010110110101101101", // 28
+    "10000000100000001000000010000000100000001", // 29
+    "11111111111111111111111111111111111111111"  // 30
+];
+
+let mapGrid = [];
+const WORLD_WIDTH = 41 * TILE_SIZE;  
+const WORLD_HEIGHT = 31 * TILE_SIZE; 
+
+let player, giraffe, centerZone, tablets, gameState, soundWaves = [];
+let itemBoxes = [], deployedItems = [];
+let camX = 0, camY = 0;
+let keys = {};
+let joystick = { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0 };
+let doorTimers = {};
+let gameNotice = { text: "", timer: 0 };
+
+// 道具權重池
+const itemPool = [
+    { name: "空罐頭", type: "CAN", weight: 25, icon: "🥫" },
+    { name: "香蕉皮", type: "BANANA", weight: 20, icon: "🍌" },
+    { name: "能量飲料", type: "DRINK", weight: 15, icon: "🧃" },
+    { name: "紙箱", type: "BOX", weight: 12, icon: "📦" },
+    { name: "鬧鐘", type: "ALARM", weight: 10, icon: "⏰" },
+    { name: "爆閃燈", type: "STROBE", weight: 7, icon: "💡" },
+    { name: "長頸鹿玩偶", type: "DOLL", weight: 5, icon: "🧸" },
+    { name: "假訊號塔", type: "TOWER", weight: 3, icon: "📡" },
+    { name: "遙控車", type: "RCCAR", weight: 2, icon: "🕹" },
+    { name: "神秘盒子", type: "MYSTERY", weight: 1, icon: "🎲" }
+];
+
+const patrolWaypoints = [
+    {x: 225, y: 325}, {x: 1825, y: 325}, {x: 225, y: 525}, 
+    {x: 1825, y: 525}, {x: 1025, y: 775}, {x: 225, y: 1225}, {x: 1825, y: 1225}
+];
+
+if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+    joystickContainer.style.display = 'block';
+    useItemBtn.style.display = 'block';
+}
+
+function parseMap() {
+    mapGrid = [];
+    for (let r = 0; r < mapTemplate.length; r++) {
+        mapGrid.push([]);
+        for (let c = 0; c < mapTemplate[r].length; c++) {
+            mapGrid[r].push(parseInt(mapTemplate[r][c]));
+        }
+    }
+}
+
+function getRandomItem() {
+    let rand = Math.random() * 100;
+    let sum = 0;
+    for (let it of itemPool) {
+        sum += it.weight;
+        if (rand <= sum) return it;
+    }
+    return itemPool[0];
+}
+
+function initGame() {
+    gameState = { over: false, won: false };
+    parseMap();
+    soundWaves = [];
+    doorTimers = {};
+    deployedItems = [];
+    gameNotice = { text: "", timer: 0 };
+    
+    // 玩家
+    player = { 
+        x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 + 50, size: 14, 
+        baseSpeed: 4.1, speed: 4.1, carrying: 0, angle: -Math.PI/2,
+        item: null, drinkTimer: 0, boxTimer: 0, mysterySpeedTimer: 0
+    };
+    
+    // 長頸鹿
+    giraffe = { 
+        x: 225, y: 525, size: 22, speed: 2.1, chaseSpeed: 4.2, patrolSpeed: 1.8,
+        angle: 0, state: 'PATROL', targetX: 225, targetY: 525,
+        sightTimer: 0, lostTimer: 0, waypointIndex: 0,
+        path: [], pathTimer: 0, searchedRoom: false,
+        ccTimer: 0, ccType: ""
+    };
+    
+    centerZone = { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, size: 45, delivered: 0 };
+
+    // 8台平板藏匿在盲區深處
+    tablets = [
+        { x: 4*TILE_SIZE+25, y: 3*TILE_SIZE+25, pickedUp: false },
+        { x: 12*TILE_SIZE+25, y: 3*TILE_SIZE+25, pickedUp: false },
+        { x: 28*TILE_SIZE+25, y: 3*TILE_SIZE+25, pickedUp: false },
+        { x: 36*TILE_SIZE+25, y: 3*TILE_SIZE+25, pickedUp: false },
+        { x: 4*TILE_SIZE+25, y: 27*TILE_SIZE+25, pickedUp: false },
+        { x: 12*TILE_SIZE+25, y: 27*TILE_SIZE+25, pickedUp: false },
+        { x: 28*TILE_SIZE+25, y: 27*TILE_SIZE+25, pickedUp: false },
+        { x: 36*TILE_SIZE+25, y: 27*TILE_SIZE+25, pickedUp: false }
+    ];
+
+    // 散落的道具補給箱
+    itemBoxes = [
+        { x: 6*50+25, y: 8*50+25, item: getRandomItem(), active: true },
+        { x: 15*50+25, y: 12*50+25, item: getRandomItem(), active: true },
+        { x: 24*50+25, y: 10*50+25, item: getRandomItem(), active: true },
+        { x: 34*50+25, y: 8*50+25, item: getRandomItem(), active: true },
+        { x: 3*50+25, y: 20*50+25, item: getRandomItem(), active: true },
+        { x: 12*50+25, y: 22*50+25, item: getRandomItem(), active: true },
+        { x: 28*50+25, y: 18*50+25, item: getRandomItem(), active: true },
+        { x: 37*50+25, y: 20*50+25, item: getRandomItem(), active: true },
+        { x: 20*50+25, y: 4*50+25, item: getRandomItem(), active: true },
+        { x: 20*50+25, y: 26*50+25, item: getRandomItem(), active: true }
+    ];
+
+    updateItemUI();
+    camX = player.x - canvas.width / 2;
+    camY = player.y - canvas.height / 2;
+}
+
+function showNotice(msg) { gameNotice.text = msg; gameNotice.timer = 150; }
+
+function updateItemUI() {
+    if (player.item) {
+        itemUI.innerText = `🎒 攜帶道具: ${player.item.icon} ${player.item.name}`;
+    } else {
+        itemUI.innerText = `🎒 攜帶道具: 無`;
+    }
+}
+
+function checkWallCollision(x, y, size) {
+    let gridXStart = Math.floor((x - size) / TILE_SIZE);
+    let gridXEnd = Math.floor((x + size) / TILE_SIZE);
+    let gridYStart = Math.floor((y - size) / TILE_SIZE);
+    let gridYEnd = Math.floor((y + size) / TILE_SIZE);
+    if (gridXStart < 0 || gridXEnd >= 41 || gridYStart < 0 || gridYEnd >= 31) return true;
+    for (let r = gridYStart; r <= gridYEnd; r++) {
+        for (let c = gridXStart; c <= gridXEnd; c++) {
+            if (mapGrid[r][c] === 1) return true; 
+        }
+    }
+    return false;
+}
+
+function checkLineOfSight(fromX, fromY, toX, toY) {
+    let dist = Math.hypot(toX - fromX, toY - fromY);
+    let steps = Math.ceil(dist / 15); 
+    for (let i = 1; i < steps; i++) {
+        let t = i / steps;
+        let cx = fromX + (toX - fromX) * t;
+        let cy = fromY + (toY - fromY) * t;
+        if (mapGrid[Math.floor(cy / TILE_SIZE)][Math.floor(cx / TILE_SIZE)] === 1) return false; 
+    }
+    return true;
+}
+
+function findPath(sx, sy, ex, ey) {
+    if (sx === ex && sy === ey) return [];
+    if (ex < 0 || ex >= 41 || ey < 0 || ey >= 31 || mapGrid[ey][ex] === 1) return [];
+    let queue = [[sx, sy]], visited = Array(31).fill().map(() => Array(41).fill(false)), parent = Array(31).fill().map(() => Array(41).fill(null));
+    visited[sy][sx] = true; let found = false; const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+    while (queue.length > 0) {
+        let [cx, cy] = queue.shift();
+        if (cx === ex && cy === ey) { found = true; break; }
+        for (let [dx, dy] of dirs) {
+            let nx = cx + dx, ny = cy + dy;
+            if (nx >= 0 && nx < 41 && ny >= 0 && ny < 31 && !visited[ny][nx] && mapGrid[ny][nx] !== 1) {
+                visited[ny][nx] = true; parent[ny][nx] = [cx, cy]; queue.push([nx, ny]);
+            }
+        }
+    }
+    if (!found) return [];
+    let path = [], curr = [ex, ey];
+    while (curr !== null) { path.push(curr); curr = parent[curr[1]][curr[0]]; }
+    return path.reverse();
+}
+
+function getThrowPoint(sx, sy, angle, maxDist) {
+    let steps = 20, currX = sx, currY = sy;
+    for (let i = 1; i <= steps; i++) {
+        let dist = (maxDist / steps) * i;
+        let nx = sx + Math.cos(angle) * dist, ny = sy + Math.sin(angle) * dist;
+        if (checkWallCollision(nx, ny, 6)) return { x: currX, y: currY };
+        currX = nx; currY = ny;
+    }
+    return { x: currX, y: currY };
+}
+
+function useCurrentItem() {
+    if (!player.item || gameState.over || gameState.won) return;
+    let type = player.item.type;
+    showNotice(`使用了 【${player.item.name}】`);
+
+    if (type === 'CAN') {
+        let pt = getThrowPoint(player.x, player.y, player.angle, 180);
+        triggerSound(pt.x, pt.y, 450);
+    } else if (type === 'BANANA') {
+        deployedItems.push({ x: player.x, y: player.y, type: 'BANANA', expired: false });
+    } else if (type === 'DRINK') {
+        player.drinkTimer = 480; // 8秒
+    } else if (type === 'BOX') {
+        player.boxTimer = 600; // 10秒
+    } else if (type === 'ALARM') {
+        deployedItems.push({ x: player.x, y: player.y, type: 'ALARM', timer: 900, expired: false });
+    } else if (type === 'STROBE') {
+        let pt = getThrowPoint(player.x, player.y, player.angle, 150);
+        soundWaves.push({ x: pt.x, y: pt.y, radius: 10, maxRadius: 200, alpha: 1, isFlash: true });
+        if (Math.hypot(giraffe.x - pt.x, giraffe.y - pt.y) < 200) {
+            giraffe.ccTimer = 300; giraffe.ccType = 'STROBE'; giraffe.path = [];
+        }
+    } else if (type === 'DOLL') {
+        deployedItems.push({ x: player.x, y: player.y, type: 'DOLL', expired: false });
+    } else if (type === 'TOWER') {
+        deployedItems.push({ x: player.x, y: player.y, type: 'TOWER', timer: 1800, expired: false });
+    } else if (type === 'RCCAR') {
+        deployedItems.push({ x: player.x, y: player.y, type: 'RCCAR', timer: 1200, angle: player.angle, expired: false });
+    } else if (type === 'MYSTERY') {
+        triggerMysteryBox();
+    }
+
+    player.item = null;
+    updateItemUI();
+}
+
+function triggerMysteryBox() {
+    let r = Math.random();
+    if (r < 0.33) {
+        player.drinkTimer = 720; player.boxTimer = 720; player.mysterySpeedTimer = 720;
+        showNotice("🎲 神秘盒子：【全面超載】獲得 12秒 隱形與雙倍神速！");
+    } else if (r < 0.66) {
+        giraffe.ccTimer = 900; giraffe.ccType = 'MYSTERY_SLEEP'; giraffe.path = [];
+        showNotice("🎲 神秘盒子：【終極癱瘓】長頸鹿陷入 15秒 深度睡眠！");
+    } else {
+        let uncollected = tablets.filter(t => !t.pickedUp), count = 0;
+        for (let t of uncollected) {
+            t.pickedUp = true; count++;
+            if (count >= 2) break;
+        }
+        centerZone.delivered += count;
+        showNotice(`🎲 神秘盒子：【傳送矩陣】直接繳回地圖上 ${count} 台平板！`);
+    }
+}
+
+function handleMovement() {
+    let dx = 0, dy = 0;
+    if (keys['w'] || keys['arrowup']) dy = -1;
+    if (keys['s'] || keys['arrowdown']) dy = 1;
+    if (keys['a'] || keys['arrowleft']) dx = -1;
+    if (keys['d'] || keys['arrowright']) dx = 1;
+    if (joystick.active) { dx = joystick.moveX; dy = joystick.moveY; }
+
+    // 計算當前速度加成
+    let speedMult = 1.0;
+    if (player.drinkTimer > 0) speedMult += 0.5;
+    if (player.mysterySpeedTimer > 0) speedMult += 0.5;
+    player.speed = player.baseSpeed * speedMult;
+
+    if (dx !== 0 || dy !== 0) {
+        let length = Math.hypot(dx, dy);
+        let moveX = (dx / length) * player.speed;
+        let moveY = (dy / length) * player.speed;
+        player.angle = Math.atan2(dy, dx);
+
+        if (!checkWallCollision(player.x + moveX, player.y, player.size)) player.x += moveX;
+        if (!checkWallCollision(player.x, player.y + moveY, player.size)) player.y += moveY;
+
+        let pGridX = Math.floor(player.x / TILE_SIZE), pGridY = Math.floor(player.y / TILE_SIZE);
+        if (mapGrid[pGridY] && mapGrid[pGridY][pGridX] === 2) {
+            mapGrid[pGridY][pGridX] = 3; 
+            triggerSound(pGridX * TILE_SIZE + 25, pGridY * TILE_SIZE + 25, 350);
+            doorTimers[`${pGridY},${pGridX}`] = 180; 
+        }
+    }
+}
+
+function triggerSound(x, y, maxRadius = 450) {
+    soundWaves.push({ x: x, y: y, radius: 10, maxRadius: maxRadius, alpha: 1, isFlash: false });
+    if (giraffe.ccTimer <= 0 && giraffe.state !== 'CHASE') {
+        giraffe.state = 'INVESTIGATE'; giraffe.targetX = x; giraffe.targetY = y; giraffe.path = []; giraffe.searchedRoom = false;
+    }
+}
+
+function updateGiraffeAI() {
+    // 若處於控場狀態
+    if (giraffe.ccTimer > 0) {
+        giraffe.ccTimer--;
+        let label = "🧬 受道具影響中";
+        if (giraffe.ccType === 'BANANA') label = "🍌 踩到香蕉皮摔得四腳朝天！ (3秒)";
+        if (giraffe.ccType === 'STROBE') label = "💡 被爆閃燈閃瞎，頭暈目眩！ (5秒)";
+        if (giraffe.ccType === 'DOLL') label = "🧸 正深情看著長頸鹿玩偶... (8秒)";
+        if (giraffe.ccType === 'MYSTERY_SLEEP') label = "💤 陷入神祕催眠深度沉睡... (15秒)";
+        statusUI.innerText = "🦒 長頸鹿狀態: " + label;
+        return;
+    }
+
+    let distToPlayer = Math.hypot(player.x - giraffe.x, player.y - giraffe.y);
+    let isPlayerHidden = player.boxTimer > 0;
+    let canSeePlayer = !isPlayerHidden && (distToPlayer <= 375) && checkLineOfSight(giraffe.x, giraffe.y, player.x, player.y);
+
+    // 檢查是否有正在運作且引怪的放置類道具
+    let activeDoll = deployedItems.find(i => i.type === 'DOLL' && !i.expired);
+    if (activeDoll && giraffe.state !== 'CHASE' && Math.hypot(giraffe.x - activeDoll.x, giraffe.y - activeDoll.y) < 90) {
+        giraffe.ccTimer = 480; giraffe.ccType = 'DOLL'; activeDoll.expired = true; return;
+    }
+
+    if (canSeePlayer) {
+        giraffe.sightTimer += 1 / 60;
+        if (giraffe.sightTimer >= 0.15) { giraffe.state = 'CHASE'; giraffe.lostTimer = 0; }
+    } else {
+        giraffe.sightTimer = Math.max(0, giraffe.sightTimer - 1/60);
+        if (giraffe.state === 'CHASE') {
+            giraffe.lostTimer += 1 / 60;
+            if (giraffe.lostTimer >= 3.0) {
+                giraffe.state = 'INVESTIGATE'; giraffe.targetX = player.x; giraffe.targetY = player.y; giraffe.path = []; giraffe.searchedRoom = false;
+            }
+        }
+    }
+
+    let currentSpeed = giraffe.patrolSpeed;
+    if (giraffe.state === 'CHASE') {
+        giraffe.targetX = player.x; giraffe.targetY = player.y; currentSpeed = giraffe.chaseSpeed;
+    } else if (giraffe.state === 'INVESTIGATE') {
+        currentSpeed = giraffe.patrolSpeed * 1.3;
+        if (Math.hypot(giraffe.x - giraffe.targetX, giraffe.y - giraffe.targetY) < 25) {
+            if (Math.hypot(player.x - giraffe.x, player.y - giraffe.y) <= 275 && !isPlayerHidden) {
+                giraffe.state = 'CHASE'; giraffe.path = [];
+            } else if (!giraffe.searchedRoom) {
+                let gGridX = Math.floor(giraffe.x / TILE_SIZE), gGridY = Math.floor(giraffe.y / TILE_SIZE);
+                giraffe.targetY = (gGridY <= 15) ? (3 * TILE_SIZE + 25) : (27 * TILE_SIZE + 25);
+                giraffe.targetX = gGridX * TILE_SIZE + 25;
+                giraffe.searchedRoom = true; giraffe.path = [];
+            } else {
+                giraffe.state = 'PATROL'; pickNextPatrolWaypoint();
+            }
+        }
+    } else {
+        if (Math.hypot(giraffe.x - giraffe.targetX, giraffe.y - giraffe.targetY) < 25) pickNextPatrolWaypoint();
+    }
+
+    giraffe.pathTimer++;
+    if (giraffe.pathTimer % 15 === 0 || giraffe.path.length === 0) {
+        giraffe.path = findPath(Math.floor(giraffe.x/TILE_SIZE), Math.floor(giraffe.y/TILE_SIZE), Math.floor(giraffe.targetX/TILE_SIZE), Math.floor(giraffe.targetY/TILE_SIZE));
+    }
+
+    let nextX = giraffe.targetX, nextY = giraffe.targetY;
+    if (giraffe.path && giraffe.path.length > 1) {
+        nextX = giraffe.path[1][0] * TILE_SIZE + 25; nextY = giraffe.path[1][1] * TILE_SIZE + 25;
+        if (Math.hypot(giraffe.x - nextX, giraffe.y - nextY) < 6) giraffe.path.shift();
+    }
+
+    let angle = Math.atan2(nextY - giraffe.y, nextX - giraffe.x);
+    giraffe.angle = angle;
+    giraffe.x += Math.cos(angle) * currentSpeed;
+    giraffe.y += Math.sin(angle) * currentSpeed;
+
+    let txt = "常態巡邏中 🌲";
+    if (giraffe.state === 'INVESTIGATE') txt = giraffe.searchedRoom ? "🔍 深入盲區排查！" : "👂 前往可疑聲源...";
+    if (giraffe.state === 'CHASE') txt = "🔥 發現目標！全力追殺中！";
+    statusUI.innerText = "🦒 長頸鹿狀態: " + txt;
+}
+
+function pickNextPatrolWaypoint() {
+    giraffe.waypointIndex = (giraffe.waypointIndex + Math.floor(Math.random() * 2 + 1)) % patrolWaypoints.length;
+    giraffe.targetX = patrolWaypoints[giraffe.waypointIndex].x;
+    giraffe.targetY = patrolWaypoints[giraffe.waypointIndex].y;
+    giraffe.path = [];
+}
+
+function update() {
+    if (gameState.over || gameState.won) return;
+
+    handleMovement();
+    updateGiraffeAI();
+
+    // 縮減玩家狀態計時
+    if (player.drinkTimer > 0) player.drinkTimer--;
+    if (player.boxTimer > 0) player.boxTimer--;
+    if (player.mysterySpeedTimer > 0) player.mysterySpeedTimer--;
+    if (gameNotice.timer > 0) gameNotice.timer--;
+
+    // 無聲自動關門
+    for (let k in doorTimers) {
+        if (doorTimers[k] > 0) {
+            doorTimers[k]--;
+            if (doorTimers[k] === 0) {
+                let [dr, dc] = k.split(',').map(Number);
+                if (mapGrid[dr][dc] === 3) mapGrid[dr][dc] = 2;
+                delete doorTimers[k];
+            }
+        }
+    }
+
+    // 更新拋出/放置類道具
+    deployedItems.forEach(item => {
+        if (item.type === 'BANANA') {
+            if (Math.hypot(giraffe.x - item.x, giraffe.y - item.y) < giraffe.size + 12 && giraffe.ccTimer <= 0) {
+                giraffe.ccTimer = 180; giraffe.ccType = 'BANANA'; item.expired = true; giraffe.path = [];
+            }
+        } else if (item.type === 'ALARM') {
+            item.timer--;
+            if (item.timer % 60 === 0) triggerSound(item.x, item.y, 500);
+            if (item.timer <= 0) item.expired = true;
+        } else if (item.type === 'TOWER') {
+            item.timer--;
+            if (item.timer % 30 === 0) triggerSound(item.x, item.y, 600);
+            if (item.timer <= 0) item.expired = true;
+        } else if (item.type === 'RCCAR') {
+            item.timer--;
+            let nx = item.x + Math.cos(item.angle) * 3.5, ny = item.y + Math.sin(item.angle) * 3.5;
+            if (checkWallCollision(nx, ny, 8)) {
+                item.angle += Math.PI + (Math.random() * 0.4 - 0.2);
+            } else {
+                item.x = nx; item.y = ny;
+            }
+            if (item.timer % 25 === 0) triggerSound(item.x, item.y, 400);
+            if (item.timer <= 0) item.expired = true;
+        }
+    });
+    deployedItems = deployedItems.filter(i => !i.expired);
+
+    // 鏡頭跟隨
+    let targetCamX = player.x - canvas.width / 2, targetCamY = player.y - canvas.height / 2;
+    camX += (targetCamX - camX) * 0.1; camY += (targetCamY - camY) * 0.1;
+    camX = Math.max(0, Math.min(camX, WORLD_WIDTH - canvas.width));
+    camY = Math.max(0, Math.min(camY, WORLD_HEIGHT - canvas.height));
+
+    // 音波擴散
+    for (let i = soundWaves.length - 1; i >= 0; i--) {
+        let wave = soundWaves[i]; wave.radius += 5; wave.alpha -= 0.015;
+        if (wave.alpha <= 0 || wave.radius >= wave.maxRadius) soundWaves.splice(i, 1);
+    }
+
+    // 撿平板
+    tablets.forEach(t => {
+        if (!t.pickedUp && Math.hypot(player.x - t.x, player.y - t.y) < player.size + 15) {
+            if (player.carrying < 2) { t.pickedUp = true; player.carrying++; warningUI.style.display = 'none'; }
+            else { warningUI.style.display = 'block'; }
+        }
+    });
+
+    // 撿補給箱道具
+    itemBoxes.forEach(b => {
+        if (b.active && !player.item && Math.hypot(player.x - b.x, player.y - b.y) < player.size + 15) {
+            b.active = false; player.item = b.item; updateItemUI();
+            showNotice(`獲得道具：${b.item.icon} ${b.item.name}`);
+        }
+    });
+
+    // 繳回平板
+    if (Math.hypot(player.x - centerZone.x, player.y - centerZone.y) < centerZone.size && player.carrying > 0) {
+        centerZone.delivered += player.carrying; player.carrying = 0; warningUI.style.display = 'none';
+    }
+
+    carryUI.innerText = `🎒 背包容量: ${player.carrying} / 2 ${player.carrying==2 ? '(滿!)' : ''}`;
+    carryUI.style.color = player.carrying === 2 ? '#f44336' : '#ffeb3b';
+    remainingCountUI.innerText = tablets.filter(t => !t.pickedUp).length;
+    deliveredCountUI.innerText = centerZone.delivered;
+
+    if (centerZone.delivered === tablets.length) { gameState.won = true; endGame("🎉 奇蹟生還！成功回收所有實驗數據平板！"); }
+    if (Math.hypot(player.x - giraffe.x, player.y - giraffe.y) < player.size + giraffe.size) { gameState.over = true; endGame("🦒 被長頸鹿正面撲倒了！實驗失敗。"); }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save(); ctx.translate(-camX, -camY);
+
+    // 畫迷宮
+    for (let r = 0; r < mapGrid.length; r++) {
+        for (let c = 0; c < mapGrid[r].length; c++) {
+            let rx = c * TILE_SIZE, ry = r * TILE_SIZE;
+            if (mapGrid[r][c] === 1) {
+                ctx.fillStyle = '#1e1e24'; ctx.fillRect(rx, ry, TILE_SIZE, TILE_SIZE);
+                ctx.strokeStyle = '#0a0a0f'; ctx.lineWidth = 1; ctx.strokeRect(rx, ry, TILE_SIZE, TILE_SIZE);
+            } else if (mapGrid[r][c] === 2 || mapGrid[r][c] === 3) {
+                ctx.fillStyle = '#0f0f12'; ctx.fillRect(rx, ry, TILE_SIZE, TILE_SIZE);
+                ctx.fillStyle = mapGrid[r][c] === 2 ? '#b0bec5' : '#455a64'; 
+                ctx.fillRect(rx + 2, ry + 16, TILE_SIZE - 4, 18);
+            } else {
+                ctx.fillStyle = '#0f0f12'; ctx.fillRect(rx, ry, TILE_SIZE, TILE_SIZE);
+            }
+        }
+    }
+
+    // 畫放置在地上的道具
+    deployedItems.forEach(item => {
+        ctx.font = "20px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        let icon = "❓";
+        if (item.type === 'BANANA') icon = "🍌";
+        if (item.type === 'ALARM') icon = "⏰";
+        if (item.type === 'DOLL') icon = "🧸";
+        if (item.type === 'TOWER') icon = "📡";
+        if (item.type === 'RCCAR') icon = "🕹";
+        ctx.fillText(icon, item.x, item.y);
+    });
+
+    // 畫補給箱
+    itemBoxes.forEach(b => {
+        if (b.active) {
+            ctx.save(); ctx.shadowBlur = 8; ctx.shadowColor = '#ff9800';
+            ctx.font = "22px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            ctx.fillText("🎁", b.x, b.y); ctx.restore();
+        }
+    });
+
+    // 畫音波/爆閃
+    soundWaves.forEach(wave => {
+        ctx.save();
+        ctx.strokeStyle = wave.isFlash ? `rgba(255,255,255,${wave.alpha})` : `rgba(255, 110, 64, ${wave.alpha})`;
+        ctx.lineWidth = wave.isFlash ? 5 : 2; if(!wave.isFlash) ctx.setLineDash([6, 6]);
+        ctx.beginPath(); ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI*2); ctx.stroke();
+        ctx.restore();
+    });
+
+    // 安全區
+    ctx.save(); ctx.shadowBlur = 15; ctx.shadowColor = '#00e5ff';
+    ctx.beginPath(); ctx.arc(centerZone.x, centerZone.y, centerZone.size, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.08)'; ctx.fill(); ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.restore();
+
+    // 平板
+    tablets.forEach(t => {
+        if (!t.pickedUp) {
+            ctx.save(); ctx.shadowBlur = 10; ctx.shadowColor = '#00e5ff';
+            ctx.fillStyle = '#111'; ctx.fillRect(t.x - 12, t.y - 9, 24, 18);
+            ctx.fillStyle = '#b2ebf2'; ctx.fillRect(t.x - 10, t.y - 7, 20, 14); ctx.restore();
+        }
+    });
+
+    // 畫玩家
+    ctx.save(); ctx.translate(player.x, player.y); ctx.rotate(player.angle);
+    if (player.boxTimer > 0) {
+        // 紙箱偽裝狀態
+        ctx.font = "24px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.rotate(-player.angle); ctx.fillText("📦", 0, 0);
+    } else {
+        let grad = ctx.createRadialGradient(0, 0, 10, 0, 0, 220);
+        grad.addColorStop(0, 'rgba(255, 255, 220, 0.2)'); grad.addColorStop(1, 'rgba(255, 255, 220, 0)');
+        ctx.fillStyle = grad; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 220, -Math.PI/6, Math.PI/6); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = (player.drinkTimer > 0) ? '#e91e63' : '#00796b'; ctx.beginPath(); ctx.arc(0, 0, player.size, 0, Math.PI*2); ctx.fill(); 
+        ctx.fillStyle = '#ffcc80'; ctx.beginPath(); ctx.arc(-2, 0, player.size * 0.7, 0, Math.PI*2); ctx.fill(); 
+        if (player.carrying > 0) { ctx.fillStyle = '#4CAF50'; for(let i=0; i<player.carrying; i++) ctx.fillRect(-16 - (i*4), -6, 3, 12); }
+    }
+    ctx.restore();
+
+    // 畫長頸鹿
+    ctx.save(); ctx.translate(giraffe.x, giraffe.y); ctx.rotate(giraffe.angle);
+    ctx.fillStyle = '#ffa726'; ctx.beginPath(); ctx.ellipse(0, 0, giraffe.size * 1.2, giraffe.size, 0, 0, Math.PI * 2); ctx.fill(); 
+    ctx.fillStyle = '#5d4037'; ctx.beginPath(); ctx.arc(-8, -6, 5, 0, Math.PI*2); ctx.arc(6, 6, 5, 0, Math.PI*2); ctx.fill(); 
+    ctx.fillStyle = '#ffa726'; ctx.fillRect(10, -6, 30, 12); 
+    ctx.fillStyle = '#fb8c00'; ctx.beginPath(); ctx.ellipse(40, 0, 11, 8, 0, 0, Math.PI * 2); ctx.fill(); 
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(43, -3, 3, 0, Math.PI*2); ctx.arc(43, 4, 3, 0, Math.PI*2); ctx.fill(); 
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(44, -3, 1.5, 0, Math.PI*2); ctx.arc(44, 4, 1.5, 0, Math.PI*2); ctx.fill();
+    if (giraffe.state === 'CHASE' && giraffe.ccTimer <= 0) { ctx.fillStyle = 'rgba(255, 0, 0, 0.45)'; ctx.beginPath(); ctx.arc(38, 0, 16, 0, Math.PI*2); ctx.fill(); }
+    ctx.restore();
+
+    ctx.restore();
+
+    // 畫通知跑馬燈
+    if (gameNotice.timer > 0) {
+        ctx.save(); ctx.fillStyle = "rgba(0,0,0,0.75)"; ctx.fillRect(canvas.width/2 - 250, 20, 500, 35);
+        ctx.strokeStyle = "#ff9800"; ctx.lineWidth = 1; ctx.strokeRect(canvas.width/2 - 250, 20, 500, 35);
+        ctx.fillStyle = "#fff"; ctx.font = "bold 14px Arial"; ctx.textAlign = "center";
+        ctx.fillText(gameNotice.text, canvas.width/2, 42); ctx.restore();
+    }
+}
+
+function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
+function startGame() { mainMenu.style.display = 'none'; messageScreen.style.display = 'none'; initGame(); }
+function endGame(msg) { messageScreen.style.display = 'flex'; messageText.innerHTML = msg; messageText.style.color = gameState.won ? '#4CAF50' : '#f44336'; }
+function backToMenu() { messageScreen.style.display = 'none'; mainMenu.style.display = 'flex'; }
+
+window.addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+    if (e.key === ' ' || e.key.toLowerCase() === 'e') { e.preventDefault(); useCurrentItem(); }
+});
+window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+joystickContainer.addEventListener('touchstart', e => {
+    joystick.active = true; const rect = joystickContainer.getBoundingClientRect();
+    joystick.startX = rect.left + rect.width / 2; joystick.startY = rect.top + rect.height / 2;
+});
+window.addEventListener('touchmove', e => {
+    if (!joystick.active) return; const touch = e.touches[0];
+    let distX = touch.clientX - joystick.startX, distY = touch.clientY - joystick.startY;
+    let maxDist = 38, distance = Math.hypot(distX, distY);
+    if (distance > maxDist) { distX = (distX / distance) * maxDist; distY = (distY / distance) * maxDist; }
+    joystickStick.style.transform = `translate(${distX}px, ${distY}px)`;
+    joystick.moveX = distX / maxDist; joystick.moveY = distY / maxDist;
+}, { passive: false });
+window.addEventListener('touchend', () => {
+    joystick.active = false; joystick.moveX = 0; joystick.moveY = 0; joystickStick.style.transform = 'translate(0px, 0px)';
+});
+
+initGame(); draw(); gameLoop();
+</script>
+</body>
+</html>
