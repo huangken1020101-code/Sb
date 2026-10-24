@@ -19,10 +19,40 @@
         #mainMenu {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: linear-gradient(rgba(0,0,0,0.65), rgba(0,0,0,0.95)), url('https://images.unsplash.com/photo-1578328819058-b69f3a3b0f6b?q=80&w=600') center/cover;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 10; overflow-y: auto; padding: 10px 0;
         }
         #mainMenu h1 { font-size: 1.8rem; color: #ff9800; text-shadow: 0 0 15px rgba(255,152,0,0.6); margin-bottom: 5px; text-align: center; }
         #mainMenu p { font-size: 0.85rem; color: #bbb; margin-bottom: 20px; text-align: center; padding: 0 20px; line-height: 1.5; }
+        #displaySettings {
+            display: grid; gap: 10px; margin: 0 20px 20px; padding: 14px 18px;
+            color: #eee; font-size: 0.9rem; background: rgba(0,0,0,0.65);
+            border: 1px solid rgba(255,152,0,0.45); border-radius: 10px;
+        }
+        #displaySettings h2 { margin: 0 0 2px; color: #ffb74d; font-size: 1rem; text-align: center; }
+        #displaySettings label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        #displaySettings input { width: 16px; height: 16px; accent-color: #ff9800; cursor: pointer; }
+        #accountPanel, #floorSelect {
+            display: grid; gap: 8px; width: min(90%, 420px); margin: 0 20px 12px;
+            padding: 12px 16px; background: rgba(0,0,0,0.72);
+            border: 1px solid rgba(0,229,255,0.4); border-radius: 10px;
+        }
+        #floorSelect[hidden] { display: none; }
+        #accountPanel h2, #floorSelect h2 { margin: 0; color: #80deea; font-size: 1rem; text-align: center; }
+        #accountForm { display: flex; gap: 6px; }
+        #accountName, #accountDomain {
+            min-width: 0; padding: 8px; color: white; background: #17171c;
+            border: 1px solid #555; border-radius: 5px;
+        }
+        #accountName { flex: 1; }
+        #accountDomain { width: 145px; }
+        #accountWarning, #accountStatus { margin: 0; font-size: 0.72rem; line-height: 1.35; text-align: center; }
+        #accountWarning { color: #ffcc80; }
+        #accountStatus { color: #80deea; min-height: 1em; }
+        #accountPanel .btn, #floorSelect .btn { padding: 8px 14px; font-size: 0.9rem; }
+        #floorButtons { display: flex; justify-content: center; gap: 10px; }
+        #floor2Button:disabled { background: #555; cursor: not-allowed; box-shadow: none; transform: none; }
+        #accountLogout { display: none; }
         .btn {
             padding: 12px 40px; font-size: 1.1rem; font-weight: bold; background: #b71c1c;
             color: white; border: none; border-radius: 25px; cursor: pointer; transition: 0.2s;
@@ -37,6 +67,8 @@
             background: rgba(10,10,10,0.9); padding: 12px 16px; border-radius: 8px; 
             border: 1px solid #444; pointer-events: none; z-index: 2; line-height: 1.6;
         }
+        #staminaTrack { width: 150px; height: 10px; margin-top: 3px; background: #333; border-radius: 5px; overflow: hidden; }
+        #staminaBar { width: 100%; height: 100%; background: #76ff03; transition: width 0.08s linear; }
         #warningUI {
             position: absolute; top: 15px; right: 15px; font-size: 15px; font-weight: bold;
             background: rgba(244,67,54,0.9); padding: 8px 12px; border-radius: 6px;
@@ -65,6 +97,13 @@
             font-weight: bold; font-size: 14px; display: none; z-index: 3;
             box-shadow: 0 4px 15px rgba(0,0,0,0.6); text-align: center; line-height: 1.2;
         }
+        #runBtn {
+            position: absolute; bottom: 30px; right: 120px; width: 75px; height: 75px;
+            background: #558b2f; color: white; border: 2px solid rgba(255,255,255,0.55);
+            border-radius: 50%; font-weight: bold; font-size: 14px; display: none;
+            z-index: 3; touch-action: none; box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+        }
+        #runBtn.active { background: #9ccc65; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     </style>
 </head>
@@ -73,28 +112,60 @@
     <div id="gameWrapper">
         <div id="mainMenu">
             <h1>長頸鹿惡夢 II：戰術道具版</h1>
-            <p>🚪 門位校正：所有房間、防線隔離門已全面優化對齊，絕不卡牆！<br>🎒 搜集平板：背包滿載 2 台時需回中央藍圈繳回，集滿 8 台即可通關。<br>⚡ 戰術道具：地圖散落補給箱，按【空白鍵 / E】或【手機按鈕】拋出反制長頸鹿！</p>
-            <button class="btn" onclick="startGame()">進入實驗室</button>
+            <p>🚪 搜集平板並回中央安全區繳交，躲避敵人，探索各層迷宮。</p>
+            <section id="accountPanel" aria-label="雲端帳號">
+                <h2 id="accountHeading">雲端存檔登入</h2>
+                <div id="accountForm">
+                    <input id="accountName" type="text" maxlength="64" autocomplete="username" placeholder="輸入帳號" aria-label="帳號">
+                    <select id="accountDomain" aria-label="帳號網域">
+                        <option value="gmail.com">@gmail.com</option>
+                        <option value="st.tc.edu.tw">@st.tc.edu.tw</option>
+                    </select>
+                </div>
+                <p id="accountWarning">不驗證身分或信箱；他人可冒用帳號查看、覆寫存檔。雲端需要 Firestore 開放未驗證存取規則。</p>
+                <p id="accountStatus" role="status"></p>
+                <button id="accountLogin" class="btn" type="button">登入雲端存檔</button>
+                <button id="accountLogout" class="btn" type="button">登出帳號</button>
+            </section>
+            <section id="floorSelect" aria-label="樓層選擇" hidden>
+                <h2>選擇樓層</h2>
+                <div id="floorButtons">
+                    <button id="floor1Button" class="btn" type="button">第一層</button>
+                    <button id="floor2Button" class="btn" type="button" disabled>第二層（尚未解鎖）</button>
+                </div>
+            </section>
+            <section id="displaySettings" aria-label="顯示設定">
+                <h2>顯示設定</h2>
+                <label><input id="showMonsterVision" type="checkbox" checked>顯示怪物視野（長頸鹿／紅玉）</label>
+                <label><input id="showFootstepRange" type="checkbox" checked>顯示走路聲音範圍（5×5 格）</label>
+                <label><input id="showDoorSoundRange" type="checkbox" checked>顯示開門聲音範圍</label>
+                <label><input id="showItemSoundRange" type="checkbox" checked>顯示道具聲音範圍</label>
+                <label><input id="showLostSightTimer" type="checkbox" checked>顯示脫離視野追逐時間</label>
+            </section>
         </div>
 
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         
         <div id="ui">
+            <div id="floorUI" style="color: #ffb74d;">📍 樓層: 第一層</div>
             <div id="carryUI" style="color: #ffeb3b;">🎒 背包容量: 0 / 2</div>
             <div style="color: #a7ffeb;">📱 剩餘平板: <span id="remainingCount">8</span></div>
-            <div style="color: #00e5ff;">🔵 已繳回中心: <span id="deliveredCount">0</span> / 8</div>
+            <div style="color: #00e5ff;">🔵 已繳回中心: <span id="deliveredCount">0</span> / <span id="deliveredTotal">8</span></div>
             <div id="itemUI" style="color: #ff9800; border-top: 1px solid #333; margin-top: 5px; padding-top: 5px;">📦 攜帶道具: 無</div>
             <div id="statusUI" style="color: #ff5722; font-size: 11px; margin-top: 4px;">🦒 長頸鹿狀態: 巡邏中</div>
+            <div id="staminaUI" style="color:#b2ff59; font-size:11px;">🏃 體力 <div id="staminaTrack"><div id="staminaBar"></div></div></div>
         </div>
 
         <div id="warningUI">🎒 背包已滿！請先回中心放平板！</div>
 
         <div id="messageScreen">
             <div id="messageText">遊戲結束</div>
+            <button id="messageActionButton" class="btn" type="button" style="display:none; margin-bottom: 12px;"></button>
             <button class="btn" onclick="backToMenu()">返回主選單</button>
         </div>
 
         <div id="joystickContainer"><div id="joystickStick"></div></div>
+        <button id="runBtn" type="button">按住<br>奔跑</button>
         <button id="useItemBtn" onclick="useCurrentItem()">使用<br>道具</button>
     </div>
 
@@ -107,11 +178,32 @@ const messageText = document.getElementById('messageText');
 const joystickContainer = document.getElementById('joystickContainer');
 const joystickStick = document.getElementById('joystickStick');
 const useItemBtn = document.getElementById('useItemBtn');
+const runBtn = document.getElementById('runBtn');
+const staminaBar = document.getElementById('staminaBar');
+const showMonsterVision = document.getElementById('showMonsterVision');
+const showFootstepRange = document.getElementById('showFootstepRange');
+const showDoorSoundRange = document.getElementById('showDoorSoundRange');
+const showItemSoundRange = document.getElementById('showItemSoundRange');
+const showLostSightTimer = document.getElementById('showLostSightTimer');
+const accountNameInput = document.getElementById('accountName');
+const accountDomainSelect = document.getElementById('accountDomain');
+const accountStatusUI = document.getElementById('accountStatus');
+const accountHeading = document.getElementById('accountHeading');
+const accountForm = document.getElementById('accountForm');
+const accountWarning = document.getElementById('accountWarning');
+const accountLoginButton = document.getElementById('accountLogin');
+const accountLogoutButton = document.getElementById('accountLogout');
+const floorSelect = document.getElementById('floorSelect');
+const floor1Button = document.getElementById('floor1Button');
+const floor2Button = document.getElementById('floor2Button');
+const messageActionButton = document.getElementById('messageActionButton');
 
 const carryUI = document.getElementById('carryUI');
+const floorUI = document.getElementById('floorUI');
 const warningUI = document.getElementById('warningUI');
 const remainingCountUI = document.getElementById('remainingCount');
 const deliveredCountUI = document.getElementById('deliveredCount');
+const deliveredTotalUI = document.getElementById('deliveredTotal');
 const itemUI = document.getElementById('itemUI');
 const statusUI = document.getElementById('statusUI');
 
@@ -153,14 +245,19 @@ const mapTemplate = [
 ];
 
 let mapGrid = [];
-const WORLD_WIDTH = 41 * TILE_SIZE;  
-const WORLD_HEIGHT = 31 * TILE_SIZE; 
+let WORLD_WIDTH = 41 * TILE_SIZE;
+let WORLD_HEIGHT = 31 * TILE_SIZE;
 
 let player, giraffe, centerZone, tablets, gameState, soundWaves = [];
 let itemBoxes = [], deployedItems = [];
+let redJade = null, prisonRoom = null;
+let secondFloorRooms = [];
+let currentFloor = 1, unlockedFloor = 1, currentAccount = "";
+let levelMapRows = mapTemplate.length, redJadeCaptureCount = 0;
 let camX = 0, camY = 0;
 let keys = {};
 let joystick = { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0 };
+let touchSprintActive = false;
 let doorTimers = {};
 let gameNotice = { text: "", timer: 0 };
 
@@ -183,18 +280,333 @@ const patrolWaypoints = [
     {x: 1825, y: 525}, {x: 1025, y: 775}, {x: 225, y: 1225}, {x: 1825, y: 1225}
 ];
 
+const FIREBASE_CONFIG = {
+    apiKey: 'AIzaSyDTYIxFK1ho76GNNrXZoqvqlvU_Pm6jVQ',
+    projectId: 'towerdefense-save'
+};
+
 if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     joystickContainer.style.display = 'block';
     useItemBtn.style.display = 'block';
+    runBtn.style.display = 'block';
 }
 
-function parseMap() {
-    mapGrid = [];
-    for (let r = 0; r < mapTemplate.length; r++) {
-        mapGrid.push([]);
-        for (let c = 0; c < mapTemplate[r].length; c++) {
-            mapGrid[r].push(parseInt(mapTemplate[r][c]));
+function generateSecondFloorTemplate() {
+    const columns = 41, rows = 31;
+    let cells = Array.from({ length: rows }, () => Array(columns).fill(1));
+    secondFloorRooms = [
+        { left: 2, right: 8, top: 2, bottom: 7 },
+        { left: 15, right: 21, top: 2, bottom: 7 },
+        { left: 28, right: 35, top: 2, bottom: 7 },
+        { left: 15, right: 23, top: 12, bottom: 18 },
+        { left: 29, right: 37, top: 12, bottom: 18 },
+        { left: 2, right: 8, top: 24, bottom: 29 },
+        { left: 15, right: 23, top: 24, bottom: 29 },
+        { left: 29, right: 37, top: 24, bottom: 29 }
+    ];
+    const carve = (x, y) => { cells[y][x] = 0; };
+    const carveHorizontal = (x1, x2, y) => {
+        for (let x = x1; x <= x2; x++) carve(x, y);
+    };
+    const carveVertical = (x, y1, y2) => {
+        for (let y = y1; y <= y2; y++) carve(x, y);
+    };
+    secondFloorRooms.forEach(room => {
+        for (let y = room.top + 1; y < room.bottom; y++) {
+            for (let x = room.left + 1; x < room.right; x++) carve(x, y);
         }
+    });
+
+    // Wide cross-corridors connect distinct rooms without turning the floor into a maze.
+    carveHorizontal(5, 33, 9);
+    carveHorizontal(5, 33, 10);
+    carveVertical(5, 7, 9);
+    carveVertical(18, 7, 11);
+    carveVertical(31, 7, 9);
+    carveVertical(33, 10, 11);
+    carveVertical(9, 10, 21);
+
+    carveHorizontal(9, 33, 20);
+    carveHorizontal(9, 33, 21);
+    carveVertical(18, 18, 20);
+    carveVertical(33, 18, 20);
+
+    carveVertical(18, 20, 24);
+    carveVertical(33, 20, 24);
+    carveHorizontal(8, 14, 26);
+    carveVertical(9, 21, 26);
+
+    // Put doors only in room boundaries; corridor junctions remain open.
+    [[5, 7], [18, 7], [31, 7], [18, 12], [33, 12],
+        [18, 18], [33, 18], [18, 24], [33, 24], [8, 26]].forEach(([x, y]) => {
+            cells[y][x] = 2;
+        });
+    return cells.map(row => row.join(""));
+}
+
+function addPrisonRoom() {
+    const bounds = currentFloor === 2
+        ? { left: 2, right: 8, top: 12, bottom: 18, exitY: 15 }
+        : { left: 2, right: 8, top: 14, bottom: 19, exitY: 16 };
+    for (let y = bounds.top; y <= bounds.bottom; y++) {
+        for (let x = bounds.left; x <= bounds.right; x++) {
+            mapGrid[y][x] = x === bounds.left || x === bounds.right || y === bounds.top || y === bounds.bottom ? 1 : 0;
+        }
+    }
+    mapGrid[bounds.exitY][bounds.right] = 2;
+    mapGrid[bounds.exitY][bounds.right + 1] = 0;
+    if (currentFloor === 2) {
+        for (let y = 13; y <= 19; y++) mapGrid[y][9] = 0;
+    }
+    prisonRoom = {
+        ...bounds,
+        x: 5 * TILE_SIZE + TILE_SIZE / 2,
+        y: Math.floor((bounds.top + bounds.bottom) / 2) * TILE_SIZE + TILE_SIZE / 2
+    };
+}
+
+function parseMap(floor = 1) {
+    currentFloor = floor;
+    let template = floor === 2 ? generateSecondFloorTemplate() : mapTemplate;
+    levelMapRows = template.length;
+    mapGrid = template.map(row => Array.from(row, Number));
+    addPrisonRoom();
+    WORLD_WIDTH = mapGrid[0].length * TILE_SIZE;
+    WORLD_HEIGHT = levelMapRows * TILE_SIZE;
+}
+
+function getOpenCells() {
+    let cells = [];
+    for (let y = 1; y < levelMapRows - 1; y++) {
+        for (let x = 1; x < mapGrid[y].length - 1; x++) {
+            if (mapGrid[y][x] !== 0) continue;
+            if (prisonRoom && x > prisonRoom.left && x < prisonRoom.right &&
+                y > prisonRoom.top && y < prisonRoom.bottom) continue;
+            let px = x * TILE_SIZE + TILE_SIZE / 2;
+            let py = y * TILE_SIZE + TILE_SIZE / 2;
+            if (mapGrid[y][x] !== 1 && !checkWallCollision(px, py, player ? player.size : 14)) {
+                cells.push({ x: px, y: py, gridX: x, gridY: y });
+            }
+        }
+    }
+    return cells;
+}
+
+function getSecondFloorRoomCells() {
+    return secondFloorRooms.filter(room => !(prisonRoom &&
+        room.left === prisonRoom.left && room.right === prisonRoom.right &&
+        room.top === prisonRoom.top && room.bottom === prisonRoom.bottom)).flatMap(room => {
+        let cells = [];
+        for (let y = room.top + 1; y < room.bottom; y++) {
+            for (let x = room.left + 1; x < room.right; x++) {
+                if (mapGrid[y][x] !== 1) {
+                    cells.push({
+                        x: x * TILE_SIZE + TILE_SIZE / 2,
+                        y: y * TILE_SIZE + TILE_SIZE / 2,
+                        gridX: x,
+                        gridY: y
+                    });
+                }
+            }
+        }
+        return cells;
+    });
+}
+
+function getNearestOpenCell(x, y, cells = getOpenCells()) {
+    return cells.reduce((nearest, cell) =>
+        !nearest || Math.hypot(cell.x - x, cell.y - y) < Math.hypot(nearest.x - x, nearest.y - y) ? cell : nearest, null);
+}
+
+function getAccountDocumentUrl(account) {
+    return `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents/gameAccounts/${encodeURIComponent(account)}?key=${FIREBASE_CONFIG.apiKey}`;
+}
+
+async function getCloudAccount(account) {
+    let response = await fetch(getAccountDocumentUrl(account));
+    if (response.status === 404) return null;
+    if (!response.ok) {
+        let details = await response.text();
+        throw new Error(`讀取雲端帳號失敗 (${response.status})：${details}`);
+    }
+    return response.json();
+}
+
+async function saveCloudProgress(account, floor) {
+    let response = await fetch(getAccountDocumentUrl(account), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            fields: {
+                unlockedFloor: { integerValue: String(floor) },
+                updatedAt: { timestampValue: new Date().toISOString() }
+            }
+        })
+    });
+    if (!response.ok) {
+        let details = await response.text();
+        throw new Error(`雲端存檔失敗 (${response.status})：${details}`);
+    }
+    return response.json();
+}
+
+function setAccountStatus(message, isError = false) {
+    accountStatusUI.innerText = message;
+    accountStatusUI.style.color = isError ? '#ff8a80' : '#80deea';
+}
+
+function setLoggedInAccount(account, highestFloor) {
+    currentAccount = account;
+    unlockedFloor = highestFloor;
+    accountHeading.innerText = `雲端帳號：${account}`;
+    accountForm.style.display = 'none';
+    accountLoginButton.style.display = 'none';
+    accountLogoutButton.style.display = 'block';
+    accountWarning.style.display = 'block';
+    floorSelect.hidden = false;
+    floor2Button.disabled = unlockedFloor < 2;
+    floor2Button.innerText = unlockedFloor >= 2 ? '第二層' : '第二層（尚未解鎖）';
+    setAccountStatus(`已連線；目前可選擇至第 ${unlockedFloor} 層。`);
+}
+
+async function loginAccount() {
+    let name = accountNameInput.value.trim();
+    if (!/^[a-zA-Z0-9._%+-]{1,64}$/.test(name)) {
+        setAccountStatus('帳號僅可使用英數字及 . _ % + -，請勿輸入網域。', true);
+        return;
+    }
+    if (!['gmail.com', 'st.tc.edu.tw'].includes(accountDomainSelect.value)) {
+        setAccountStatus('只支援 gmail.com 或 st.tc.edu.tw 網域。', true);
+        return;
+    }
+    let account = `${name}@${accountDomainSelect.value}`.toLowerCase();
+    accountLoginButton.disabled = true;
+    setAccountStatus('正在讀取雲端存檔…');
+    try {
+        let document = await getCloudAccount(account);
+        let storedFloor = document ? Number(document.fields?.unlockedFloor?.integerValue || 1) : 1;
+        let highestFloor = storedFloor === 2 ? 2 : 1;
+        if (!document) await saveCloudProgress(account, highestFloor);
+        setLoggedInAccount(account, highestFloor);
+    } catch (error) {
+        setAccountStatus(error.message, true);
+    } finally {
+        accountLoginButton.disabled = false;
+    }
+}
+
+function logoutAccount() {
+    currentAccount = "";
+    unlockedFloor = 1;
+    accountHeading.innerText = '雲端存檔登入';
+    accountForm.style.display = 'flex';
+    accountLoginButton.style.display = 'block';
+    accountLogoutButton.style.display = 'none';
+    floorSelect.hidden = true;
+    setAccountStatus('');
+}
+
+function showMessageAction(label, action) {
+    messageActionButton.innerText = label;
+    messageActionButton.onclick = action;
+    messageActionButton.style.display = 'block';
+}
+
+function hideMessageAction() {
+    messageActionButton.style.display = 'none';
+    messageActionButton.onclick = null;
+}
+
+async function unlockSecondFloorAndContinue() {
+    messageScreen.style.display = 'none';
+    hideMessageAction();
+    try {
+        await saveCloudProgress(currentAccount, 2);
+        unlockedFloor = 2;
+        floor2Button.disabled = false;
+        floor2Button.innerText = '第二層';
+        showNotice('地板爆裂！正在墜入第二層迷宮…');
+        setTimeout(() => startGame(2), 1200);
+    } catch (error) {
+        messageText.innerText = `第二層解鎖存檔失敗：${error.message}`;
+        messageScreen.style.display = 'flex';
+        showMessageAction('重試雲端存檔', unlockSecondFloorAndContinue);
+    }
+}
+
+function getRandomOpenCell(cells, minimumDistanceFrom = []) {
+    let candidates = cells.filter(cell => minimumDistanceFrom.every(point =>
+        Math.hypot(cell.x - point.x, cell.y - point.y) >= 250));
+    if (candidates.length === 0) candidates = cells;
+    return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+function initializeSecondFloor() {
+    let openCells = getOpenCells();
+    let playerCell = getNearestOpenCell(75, 75, openCells);
+    let centerCell = getNearestOpenCell(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, openCells);
+    player.x = playerCell.x;
+    player.y = playerCell.y;
+    player.soundGridX = playerCell.gridX;
+    player.soundGridY = playerCell.gridY;
+    centerZone = { x: centerCell.x, y: centerCell.y, size: 45, delivered: 0 };
+
+    let farCells = openCells.filter(cell => Math.hypot(cell.x - player.x, cell.y - player.y) > 500);
+    let giraffeCell = getRandomOpenCell(farCells, [player, centerZone]);
+    giraffe.x = giraffeCell.x;
+    giraffe.y = giraffeCell.y;
+    giraffe.targetX = giraffe.x;
+    giraffe.targetY = giraffe.y;
+    giraffe.lastSeenX = giraffe.x;
+    giraffe.lastSeenY = giraffe.y;
+    giraffe.lostTargetX = giraffe.x;
+    giraffe.lostTargetY = giraffe.y;
+    giraffe.waypointIndex = 0;
+
+    let jadeCell = getRandomOpenCell(openCells, [player, centerZone, giraffe]);
+    let jadeNeighbors = [[1,0],[0,1],[-1,0],[0,-1]];
+    let facing = jadeNeighbors.find(([dx, dy]) => {
+        let x = (jadeCell.gridX + dx) * TILE_SIZE + TILE_SIZE / 2;
+        let y = (jadeCell.gridY + dy) * TILE_SIZE + TILE_SIZE / 2;
+        return !checkWallCollision(x, y, 4);
+    }) || [1,0];
+    redJade = {
+        x: jadeCell.x, y: jadeCell.y, angle: Math.atan2(facing[1], facing[0]), size: 20,
+        targetX: jadeCell.x, targetY: jadeCell.y, path: [], pathTimer: 0,
+        pathGoalX: -1, pathGoalY: -1, waypointIndex: 0, alertedTimer: 0,
+        lastSeenX: jadeCell.x, lastSeenY: jadeCell.y
+    };
+
+    let used = [playerCell, centerCell, giraffeCell, jadeCell];
+    tablets = [];
+    for (let room of secondFloorRooms.filter(room => !(room.left === prisonRoom.left &&
+        room.right === prisonRoom.right && room.top === prisonRoom.top && room.bottom === prisonRoom.bottom))) {
+        let roomCells = getSecondFloorRoomCells()
+            .filter(cell => cell.gridX > room.left && cell.gridX < room.right &&
+                cell.gridY > room.top && cell.gridY < room.bottom);
+        let tabletCells = roomCells.filter(cell =>
+            used.every(point => Math.hypot(cell.x - point.x, cell.y - point.y) > 125));
+        if (tabletCells.length === 0) {
+            tabletCells = roomCells.filter(cell =>
+                used.every(point => Math.hypot(cell.x - point.x, cell.y - point.y) > 50));
+        }
+        if (tabletCells.length === 0) tabletCells = roomCells;
+        let cell = tabletCells[Math.floor(Math.random() * tabletCells.length)];
+        tablets.push({ x: cell.x, y: cell.y, pickedUp: false });
+        used.push(cell);
+    }
+
+    itemBoxes = [];
+    let itemCells = openCells.filter(cell =>
+        used.every(point => Math.hypot(cell.x - point.x, cell.y - point.y) > 75));
+    for (let i = 0; i < 12 && itemCells.length > 0; i++) {
+        let validCells = itemCells.filter(cell => itemBoxes.every(box =>
+            Math.max(Math.abs(cell.gridX - Math.floor(box.x / TILE_SIZE)),
+                Math.abs(cell.gridY - Math.floor(box.y / TILE_SIZE))) >= 3));
+        if (validCells.length === 0) break;
+        let cell = validCells[Math.floor(Math.random() * validCells.length)];
+        itemCells = itemCells.filter(candidate => candidate !== cell);
+        itemBoxes.push({ x: cell.x, y: cell.y, item: getRandomItem(), active: true });
     }
 }
 
@@ -208,58 +620,71 @@ function getRandomItem() {
     return itemPool[0];
 }
 
-function initGame() {
-    gameState = { over: false, won: false };
-    parseMap();
+function initGame(floor = 1) {
+    gameState = { over: false, won: false, transition: false, floor: floor };
+    parseMap(floor);
     soundWaves = [];
     doorTimers = {};
     deployedItems = [];
+    redJade = null;
+    redJadeCaptureCount = 0;
     gameNotice = { text: "", timer: 0 };
     
     // 玩家
     player = { 
-        x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 + 50, size: 14, 
+        x: WORLD_WIDTH / 2, y: (levelMapRows * TILE_SIZE) / 2 + 50, size: 14, 
         baseSpeed: 4.1, speed: 4.1, carrying: 0, angle: -Math.PI/2,
-        item: null, drinkTimer: 0, boxTimer: 0, mysterySpeedTimer: 0
+        item: null, drinkTimer: 0, boxTimer: 0, mysterySpeedTimer: 0,
+        soundGridX: Math.floor((WORLD_WIDTH / 2) / TILE_SIZE),
+        soundGridY: Math.floor(((levelMapRows * TILE_SIZE) / 2 + 50) / TILE_SIZE),
+        isMoving: false, itemNoiseTimer: 0, inPrison: false, prisonTimer: 0,
+        inPrisonRoom: false, stamina: 450, sprintRecoveryDelay: 0,
+        sprintExhausted: false, isRunning: false, savedX: 0, savedY: 0
     };
     
     // 長頸鹿
     giraffe = { 
         x: 225, y: 525, size: 22, speed: 2.1, chaseSpeed: 4.2, patrolSpeed: 1.8,
         angle: 0, state: 'PATROL', targetX: 225, targetY: 525,
-        sightTimer: 0, lostTimer: 0, waypointIndex: 0,
-        path: [], pathTimer: 0, searchedRoom: false,
+        sightTimer: 0, lostTimer: 0, lostTargetReached: false, waypointIndex: 0,
+        lastSeenX: 225, lastSeenY: 525, lastSeenAngle: 0,
+        lostTargetX: 225, lostTargetY: 525,
+        path: [], pathTimer: 0, pathGoalX: -1, pathGoalY: -1, lostSearchIndex: 0, lostPredictionSet: false, searchedRoom: false,
         ccTimer: 0, ccType: ""
     };
     
     centerZone = { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, size: 45, delivered: 0 };
 
-    // 8台平板藏匿在盲區深處
-    tablets = [
-        { x: 4*TILE_SIZE+25, y: 3*TILE_SIZE+25, pickedUp: false },
-        { x: 12*TILE_SIZE+25, y: 3*TILE_SIZE+25, pickedUp: false },
-        { x: 28*TILE_SIZE+25, y: 3*TILE_SIZE+25, pickedUp: false },
-        { x: 36*TILE_SIZE+25, y: 3*TILE_SIZE+25, pickedUp: false },
-        { x: 4*TILE_SIZE+25, y: 27*TILE_SIZE+25, pickedUp: false },
-        { x: 12*TILE_SIZE+25, y: 27*TILE_SIZE+25, pickedUp: false },
-        { x: 28*TILE_SIZE+25, y: 27*TILE_SIZE+25, pickedUp: false },
-        { x: 36*TILE_SIZE+25, y: 27*TILE_SIZE+25, pickedUp: false }
-    ];
+    if (floor === 1) {
+        floorUI.innerText = '📍 樓層: 第一層';
+        tablets = [
+            { x: 4*TILE_SIZE+25, y: 3*TILE_SIZE+25, pickedUp: false },
+            { x: 12*TILE_SIZE+25, y: 3*TILE_SIZE+25, pickedUp: false },
+            { x: 28*TILE_SIZE+25, y: 3*TILE_SIZE+25, pickedUp: false },
+            { x: 36*TILE_SIZE+25, y: 3*TILE_SIZE+25, pickedUp: false },
+            { x: 4*TILE_SIZE+25, y: 27*TILE_SIZE+25, pickedUp: false },
+            { x: 12*TILE_SIZE+25, y: 27*TILE_SIZE+25, pickedUp: false },
+            { x: 28*TILE_SIZE+25, y: 27*TILE_SIZE+25, pickedUp: false },
+            { x: 36*TILE_SIZE+25, y: 27*TILE_SIZE+25, pickedUp: false }
+        ];
+        itemBoxes = [
+            { x: 6*50+25, y: 8*50+25, item: getRandomItem(), active: true },
+            { x: 15*50+25, y: 12*50+25, item: getRandomItem(), active: true },
+            { x: 24*50+25, y: 10*50+25, item: getRandomItem(), active: true },
+            { x: 34*50+25, y: 8*50+25, item: getRandomItem(), active: true },
+            { x: 3*50+25, y: 20*50+25, item: getRandomItem(), active: true },
+            { x: 12*50+25, y: 22*50+25, item: getRandomItem(), active: true },
+            { x: 28*50+25, y: 18*50+25, item: getRandomItem(), active: true },
+            { x: 37*50+25, y: 20*50+25, item: getRandomItem(), active: true },
+            { x: 20*50+25, y: 4*50+25, item: getRandomItem(), active: true },
+            { x: 20*50+25, y: 26*50+25, item: getRandomItem(), active: true }
+        ];
+    } else {
+        floorUI.innerText = '📍 樓層: 第二層';
+        initializeSecondFloor();
+    }
 
-    // 散落的道具補給箱
-    itemBoxes = [
-        { x: 6*50+25, y: 8*50+25, item: getRandomItem(), active: true },
-        { x: 15*50+25, y: 12*50+25, item: getRandomItem(), active: true },
-        { x: 24*50+25, y: 10*50+25, item: getRandomItem(), active: true },
-        { x: 34*50+25, y: 8*50+25, item: getRandomItem(), active: true },
-        { x: 3*50+25, y: 20*50+25, item: getRandomItem(), active: true },
-        { x: 12*50+25, y: 22*50+25, item: getRandomItem(), active: true },
-        { x: 28*50+25, y: 18*50+25, item: getRandomItem(), active: true },
-        { x: 37*50+25, y: 20*50+25, item: getRandomItem(), active: true },
-        { x: 20*50+25, y: 4*50+25, item: getRandomItem(), active: true },
-        { x: 20*50+25, y: 26*50+25, item: getRandomItem(), active: true }
-    ];
-
+    warningUI.style.display = 'none';
     updateItemUI();
     camX = player.x - canvas.width / 2;
     camY = player.y - canvas.height / 2;
@@ -280,13 +705,42 @@ function checkWallCollision(x, y, size) {
     let gridXEnd = Math.floor((x + size) / TILE_SIZE);
     let gridYStart = Math.floor((y - size) / TILE_SIZE);
     let gridYEnd = Math.floor((y + size) / TILE_SIZE);
-    if (gridXStart < 0 || gridXEnd >= 41 || gridYStart < 0 || gridYEnd >= 31) return true;
+    if (gridXStart < 0 || gridXEnd >= mapGrid[0].length || gridYStart < 0 || gridYEnd >= mapGrid.length) return true;
     for (let r = gridYStart; r <= gridYEnd; r++) {
         for (let c = gridXStart; c <= gridXEnd; c++) {
-            if (mapGrid[r][c] === 1) return true; 
+            if (mapGrid[r][c] !== 1) continue;
+            let nearestX = Math.max(c * TILE_SIZE, Math.min(x, (c + 1) * TILE_SIZE));
+            let nearestY = Math.max(r * TILE_SIZE, Math.min(y, (r + 1) * TILE_SIZE));
+            if (Math.hypot(x - nearestX, y - nearestY) < size) return true;
         }
     }
     return false;
+}
+
+function moveWithWallSlide(entity, moveX, moveY, size) {
+    let steps = Math.max(1, Math.ceil(Math.max(Math.abs(moveX), Math.abs(moveY)) / 2));
+    let stepX = moveX / steps;
+    let stepY = moveY / steps;
+    let moved = false;
+    for (let i = 0; i < steps; i++) {
+        if (!checkWallCollision(entity.x + stepX, entity.y + stepY, size)) {
+            entity.x += stepX;
+            entity.y += stepY;
+            moved = true;
+            continue;
+        }
+        let canMoveX = !checkWallCollision(entity.x + stepX, entity.y, size);
+        let canMoveY = !checkWallCollision(entity.x, entity.y + stepY, size);
+        if (canMoveX) {
+            entity.x += stepX;
+            moved = true;
+        }
+        if (canMoveY) {
+            entity.y += stepY;
+            moved = true;
+        }
+    }
+    return moved;
 }
 
 function checkLineOfSight(fromX, fromY, toX, toY) {
@@ -301,17 +755,23 @@ function checkLineOfSight(fromX, fromY, toX, toY) {
     return true;
 }
 
-function findPath(sx, sy, ex, ey) {
+function findPath(sx, sy, ex, ey, agentSize = 0) {
     if (sx === ex && sy === ey) return [];
-    if (ex < 0 || ex >= 41 || ey < 0 || ey >= 31 || mapGrid[ey][ex] === 1) return [];
-    let queue = [[sx, sy]], visited = Array(31).fill().map(() => Array(41).fill(false)), parent = Array(31).fill().map(() => Array(41).fill(null));
+    let rows = mapGrid.length, columns = mapGrid[0].length;
+    if (sx < 0 || sx >= columns || sy < 0 || sy >= rows ||
+        ex < 0 || ex >= columns || ey < 0 || ey >= rows || mapGrid[ey][ex] === 1) return [];
+    let canOccupy = (x, y) => mapGrid[y][x] !== 1 &&
+        (agentSize === 0 || !checkWallCollision(x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2, agentSize));
+    if (!canOccupy(ex, ey)) return [];
+    let queue = [[sx, sy]], visited = Array(rows).fill().map(() => Array(columns).fill(false)), parent = Array(rows).fill().map(() => Array(columns).fill(null));
     visited[sy][sx] = true; let found = false; const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
-    while (queue.length > 0) {
-        let [cx, cy] = queue.shift();
+    let queueIndex = 0;
+    while (queueIndex < queue.length) {
+        let [cx, cy] = queue[queueIndex++];
         if (cx === ex && cy === ey) { found = true; break; }
         for (let [dx, dy] of dirs) {
             let nx = cx + dx, ny = cy + dy;
-            if (nx >= 0 && nx < 41 && ny >= 0 && ny < 31 && !visited[ny][nx] && mapGrid[ny][nx] !== 1) {
+            if (nx >= 0 && nx < columns && ny >= 0 && ny < rows && !visited[ny][nx] && canOccupy(nx, ny)) {
                 visited[ny][nx] = true; parent[ny][nx] = [cx, cy]; queue.push([nx, ny]);
             }
         }
@@ -320,6 +780,93 @@ function findPath(sx, sy, ex, ey) {
     let path = [], curr = [ex, ey];
     while (curr !== null) { path.push(curr); curr = parent[curr[1]][curr[0]]; }
     return path.reverse();
+}
+
+function findGiraffePath(sx, sy, ex, ey) {
+    let path = findPath(sx, sy, ex, ey, giraffe.size);
+    if (path.length > 0 || (sx === ex && sy === ey)) return { path, x: ex, y: ey };
+
+    for (let radius = 1; radius <= 6; radius++) {
+        let candidates = [];
+        for (let y = Math.max(0, ey - radius); y <= Math.min(levelMapRows - 1, ey + radius); y++) {
+            for (let x = Math.max(0, ex - radius); x <= Math.min(mapGrid[0].length - 1, ex + radius); x++) {
+                if (Math.max(Math.abs(x - ex), Math.abs(y - ey)) !== radius ||
+                    checkWallCollision(x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2, giraffe.size)) continue;
+                candidates.push({ x, y, distance: Math.hypot(x - ex, y - ey) });
+            }
+        }
+        candidates.sort((a, b) => a.distance - b.distance);
+        for (let candidate of candidates) {
+            path = sx === candidate.x && sy === candidate.y
+                ? [[sx, sy]]
+                : findPath(sx, sy, candidate.x, candidate.y, giraffe.size);
+            if (path.length > 0) return { path, x: candidate.x, y: candidate.y };
+        }
+    }
+    return { path: [], x: ex, y: ey };
+}
+
+function getClearGiraffeTarget(x, y) {
+    let gridX = Math.floor(x / TILE_SIZE), gridY = Math.floor(y / TILE_SIZE);
+    if (!checkWallCollision(x, y, giraffe.size) &&
+        !checkWallCollision(gridX * TILE_SIZE + TILE_SIZE / 2, gridY * TILE_SIZE + TILE_SIZE / 2, giraffe.size)) {
+        return { x, y };
+    }
+    let startX = Math.floor(giraffe.x / TILE_SIZE), startY = Math.floor(giraffe.y / TILE_SIZE);
+    for (let radius = 0; radius <= 6; radius++) {
+        let candidates = [];
+        for (let candidateY = Math.max(0, gridY - radius); candidateY <= Math.min(30, gridY + radius); candidateY++) {
+            for (let candidateX = Math.max(0, gridX - radius); candidateX <= Math.min(40, gridX + radius); candidateX++) {
+                if (Math.max(Math.abs(candidateX - gridX), Math.abs(candidateY - gridY)) !== radius) continue;
+                let centerX = candidateX * TILE_SIZE + TILE_SIZE / 2;
+                let centerY = candidateY * TILE_SIZE + TILE_SIZE / 2;
+                if (!checkWallCollision(centerX, centerY, giraffe.size)) {
+                    candidates.push({ x: centerX, y: centerY, distance: Math.hypot(centerX - x, centerY - y) });
+                }
+            }
+        }
+        candidates.sort((a, b) => a.distance - b.distance);
+        for (let candidate of candidates) {
+            let candidateGridX = Math.floor(candidate.x / TILE_SIZE);
+            let candidateGridY = Math.floor(candidate.y / TILE_SIZE);
+            if ((candidateGridX === startX && candidateGridY === startY) ||
+                findPath(startX, startY, Math.floor(candidate.x / TILE_SIZE), Math.floor(candidate.y / TILE_SIZE), giraffe.size).length > 0) {
+                return { x: candidate.x, y: candidate.y };
+            }
+        }
+    }
+    for (let radius = 6; radius <= giraffe.size + player.size; radius += 6) {
+        for (let i = 0; i < 16; i++) {
+            let angle = i * Math.PI / 8;
+            let candidateX = Math.max(giraffe.size, Math.min(WORLD_WIDTH - giraffe.size, x + Math.cos(angle) * radius));
+            let candidateY = Math.max(giraffe.size, Math.min(WORLD_HEIGHT - giraffe.size, y + Math.sin(angle) * radius));
+            if (!checkWallCollision(candidateX, candidateY, giraffe.size)) return { x: candidateX, y: candidateY };
+        }
+    }
+    return { x, y };
+}
+
+function setNextLostSearchTarget() {
+    const offsets = [[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
+    for (let attempt = 0; attempt < offsets.length; attempt++) {
+        let index = (giraffe.lostSearchIndex + 1) % offsets.length;
+        let [offsetX, offsetY] = offsets[index];
+        let x = giraffe.lostTargetX + offsetX * TILE_SIZE;
+        let y = giraffe.lostTargetY + offsetY * TILE_SIZE;
+        if (x >= giraffe.size && x <= WORLD_WIDTH - giraffe.size &&
+            y >= giraffe.size && y < levelMapRows * TILE_SIZE - giraffe.size &&
+            !checkWallCollision(x, y, giraffe.size)) {
+            giraffe.lostSearchIndex = index;
+            giraffe.targetX = x;
+            giraffe.targetY = y;
+            giraffe.path = [];
+            return true;
+        }
+        giraffe.lostSearchIndex = index;
+    }
+    giraffe.targetX = giraffe.lostTargetX;
+    giraffe.targetY = giraffe.lostTargetY;
+    return false;
 }
 
 function getThrowPoint(sx, sy, angle, maxDist) {
@@ -334,13 +881,14 @@ function getThrowPoint(sx, sy, angle, maxDist) {
 }
 
 function useCurrentItem() {
-    if (!player.item || gameState.over || gameState.won) return;
+    if (!player.item || gameState.over || gameState.won || player.inPrison) return;
     let type = player.item.type;
+    if (currentFloor === 2) player.itemNoiseTimer = 20;
     showNotice(`使用了 【${player.item.name}】`);
 
     if (type === 'CAN') {
         let pt = getThrowPoint(player.x, player.y, player.angle, 180);
-        triggerSound(pt.x, pt.y, 450);
+        triggerSound(pt.x, pt.y, 450, 0, 'item');
     } else if (type === 'BANANA') {
         deployedItems.push({ x: player.x, y: player.y, type: 'BANANA', expired: false });
     } else if (type === 'DRINK') {
@@ -369,6 +917,152 @@ function useCurrentItem() {
     updateItemUI();
 }
 
+function canEnemySeePlayer(enemy) {
+    let dx = player.x - enemy.x, dy = player.y - enemy.y;
+    let distance = Math.hypot(dx, dy);
+    let angleToPlayer = Math.atan2(dy, dx);
+    let angleDifference = Math.atan2(Math.sin(angleToPlayer - enemy.angle), Math.cos(angleToPlayer - enemy.angle));
+    return player.boxTimer <= 0 && distance <= 375 && Math.abs(angleDifference) <= Math.PI / 3 &&
+        checkLineOfSight(enemy.x, enemy.y, player.x, player.y);
+}
+
+function capturePlayerByRedJade() {
+    redJadeCaptureCount++;
+    player.savedX = player.x;
+    player.savedY = player.y;
+    player.inPrison = true;
+    player.inPrisonRoom = true;
+    player.prisonTimer = redJadeCaptureCount * 5 * 60;
+    player.isMoving = false;
+    player.isRunning = false;
+    player.itemNoiseTimer = 0;
+    player.x = prisonRoom.x;
+    player.y = prisonRoom.y;
+    redJade.escortingPrisoner = true;
+    redJade.alertedTimer = 0;
+    redJade.targetX = prisonRoom.x;
+    redJade.targetY = prisonRoom.y;
+    redJade.path = [];
+    redJade.pathTimer = 0;
+    redJade.pathGoalX = -1;
+    redJade.pathGoalY = -1;
+    redJade.prisonSoundPlayed = false;
+    keys = {};
+    joystick.active = false;
+    joystick.moveX = 0;
+    joystick.moveY = 0;
+    touchSprintActive = false;
+    runBtn.classList.remove('active');
+    joystickStick.style.transform = 'translate(0px, 0px)';
+    camX = Math.max(0, Math.min(player.x - canvas.width / 2, WORLD_WIDTH - canvas.width));
+    camY = Math.max(0, Math.min(player.y - canvas.height / 2, WORLD_HEIGHT - canvas.height));
+    showNotice(`🔴 被紅玉抓進小黑屋！${redJadeCaptureCount * 5} 秒後釋放。`);
+}
+
+function updateRedJade() {
+    if (currentFloor !== 2 || !redJade) return false;
+    let seesPlayer = !player.inPrison && canEnemySeePlayer(redJade);
+    let alertsEnemy = seesPlayer && (player.isRunning || player.itemNoiseTimer > 0);
+    if (alertsEnemy) {
+        redJade.alertedTimer = 300;
+        redJade.lastSeenX = player.x;
+        redJade.lastSeenY = player.y;
+    } else if (redJade.alertedTimer > 0) {
+        redJade.alertedTimer--;
+    }
+
+    let isEscortingPrisoner = redJade.escortingPrisoner;
+    let isChasing = !isEscortingPrisoner && redJade.alertedTimer > 0;
+    if (isEscortingPrisoner) {
+        redJade.targetX = prisonRoom.x;
+        redJade.targetY = prisonRoom.y;
+    } else if (isChasing) {
+        redJade.targetX = seesPlayer ? player.x : redJade.lastSeenX;
+        redJade.targetY = seesPlayer ? player.y : redJade.lastSeenY;
+    } else if (Math.hypot(redJade.x - redJade.targetX, redJade.y - redJade.targetY) < 25) {
+        let patrolCell = getRandomOpenCell(getOpenCells(), [redJade]);
+        redJade.targetX = patrolCell.x;
+        redJade.targetY = patrolCell.y;
+        redJade.path = [];
+        redJade.pathGoalX = -1;
+        redJade.pathGoalY = -1;
+    }
+
+    redJade.pathTimer++;
+    let goalGridX = Math.floor(redJade.targetX / TILE_SIZE);
+    let goalGridY = Math.floor(redJade.targetY / TILE_SIZE);
+    if (redJade.pathTimer % 15 === 0 || redJade.path.length === 0 ||
+        goalGridX !== redJade.pathGoalX || goalGridY !== redJade.pathGoalY) {
+        let path = findPath(
+            Math.floor(redJade.x / TILE_SIZE),
+            Math.floor(redJade.y / TILE_SIZE),
+            goalGridX,
+            goalGridY,
+            redJade.size
+        );
+        if (path.length === 0 && (Math.floor(redJade.x / TILE_SIZE) !== goalGridX ||
+            Math.floor(redJade.y / TILE_SIZE) !== goalGridY)) {
+            let reachableCells = getOpenCells()
+                .sort((a, b) =>
+                    Math.hypot(a.gridX - goalGridX, a.gridY - goalGridY) -
+                    Math.hypot(b.gridX - goalGridX, b.gridY - goalGridY));
+            for (let cell of reachableCells) {
+                path = findPath(
+                    Math.floor(redJade.x / TILE_SIZE),
+                    Math.floor(redJade.y / TILE_SIZE),
+                    cell.gridX,
+                    cell.gridY,
+                    redJade.size
+                );
+                if (path.length > 0) {
+                    redJade.targetX = cell.x;
+                    redJade.targetY = cell.y;
+                    goalGridX = cell.gridX;
+                    goalGridY = cell.gridY;
+                    break;
+                }
+            }
+        }
+        redJade.path = path;
+        redJade.pathGoalX = goalGridX;
+        redJade.pathGoalY = goalGridY;
+    }
+
+    let nextX = redJade.targetX;
+    let nextY = redJade.targetY;
+    if (redJade.path.length > 1) {
+        let [nextGridX, nextGridY] = redJade.path[1];
+        nextX = nextGridX * TILE_SIZE + TILE_SIZE / 2;
+        nextY = nextGridY * TILE_SIZE + TILE_SIZE / 2;
+    }
+    let dx = nextX - redJade.x;
+    let dy = nextY - redJade.y;
+    let distance = Math.hypot(dx, dy);
+    if (distance > 0.5) {
+        redJade.angle = Math.atan2(dy, dx);
+        let speed = player.speed * (isChasing ? 1.5 : 1);
+        let step = Math.min(speed, distance);
+        moveWithWallSlide(redJade, dx / distance * step, dy / distance * step, redJade.size);
+    } else if (!isChasing) {
+        redJade.waypointIndex++;
+    }
+
+    if (isEscortingPrisoner && !redJade.prisonSoundPlayed &&
+        Math.hypot(redJade.x - prisonRoom.x, redJade.y - prisonRoom.y) < player.size) {
+        redJade.escortingPrisoner = false;
+        redJade.prisonSoundPlayed = true;
+        triggerSound(redJade.x, redJade.y, Math.hypot(WORLD_WIDTH, WORLD_HEIGHT),
+            Math.max(mapGrid[0].length, mapGrid.length), 'prison');
+    }
+
+    if (isChasing && !player.inPrison &&
+        Math.hypot(redJade.x - player.x, redJade.y - player.y) < redJade.size + player.size) {
+        capturePlayerByRedJade();
+        return true;
+    }
+    return false;
+}
+
 function triggerMysteryBox() {
     let r = Math.random();
     if (r < 0.33) {
@@ -389,6 +1083,7 @@ function triggerMysteryBox() {
 }
 
 function handleMovement() {
+    player.isMoving = false;
     let dx = 0, dy = 0;
     if (keys['w'] || keys['arrowup']) dy = -1;
     if (keys['s'] || keys['arrowdown']) dy = 1;
@@ -400,29 +1095,85 @@ function handleMovement() {
     let speedMult = 1.0;
     if (player.drinkTimer > 0) speedMult += 0.5;
     if (player.mysterySpeedTimer > 0) speedMult += 0.5;
-    player.speed = player.baseSpeed * speedMult;
+    let sprintInput = (keys['shift'] || touchSprintActive) && !player.sprintExhausted;
+    let wantsToSprint = sprintInput && player.stamina > 0 && (dx !== 0 || dy !== 0);
+    player.speed = player.baseSpeed * speedMult * (wantsToSprint ? 1.4 : 1);
 
     if (dx !== 0 || dy !== 0) {
+        let previousX = player.x, previousY = player.y;
         let length = Math.hypot(dx, dy);
         let moveX = (dx / length) * player.speed;
         let moveY = (dy / length) * player.speed;
         player.angle = Math.atan2(dy, dx);
-
-        if (!checkWallCollision(player.x + moveX, player.y, player.size)) player.x += moveX;
-        if (!checkWallCollision(player.x, player.y + moveY, player.size)) player.y += moveY;
+        moveWithWallSlide(player, moveX, moveY, player.size);
 
         let pGridX = Math.floor(player.x / TILE_SIZE), pGridY = Math.floor(player.y / TILE_SIZE);
         if (mapGrid[pGridY] && mapGrid[pGridY][pGridX] === 2) {
             mapGrid[pGridY][pGridX] = 3; 
-            triggerSound(pGridX * TILE_SIZE + 25, pGridY * TILE_SIZE + 25, 350);
+            let doorRange = currentFloor * 30;
+            triggerSound(pGridX * TILE_SIZE + 25, pGridY * TILE_SIZE + 25,
+                doorRange * TILE_SIZE / 2, 0, 'door');
             doorTimers[`${pGridY},${pGridX}`] = 180; 
         }
+
+        player.isMoving = player.x !== previousX || player.y !== previousY;
+        if (pGridX !== player.soundGridX || pGridY !== player.soundGridY) {
+            player.soundGridX = pGridX;
+            player.soundGridY = pGridY;
+            triggerSound(player.x, player.y, TILE_SIZE * 2.5, 2, 'footstep');
+        }
+    }
+    player.isRunning = wantsToSprint && player.isMoving;
+    if (player.isMoving) {
+        player.sprintRecoveryDelay = 90;
+        if (player.isRunning) {
+            player.stamina = Math.max(0, player.stamina - 1);
+            if (player.stamina === 0) player.sprintExhausted = true;
+        }
+    } else if (player.sprintRecoveryDelay > 0) {
+        player.sprintRecoveryDelay--;
+        if (player.sprintRecoveryDelay === 0) {
+            player.stamina = Math.min(450, player.stamina + 0.75);
+        }
+    } else {
+        player.stamina = Math.min(450, player.stamina + 0.75);
+    }
+    if (!player.isRunning) {
+        if (!(keys['shift'] || touchSprintActive)) player.sprintExhausted = false;
+    }
+    staminaBar.style.width = `${player.stamina / 450 * 100}%`;
+    staminaBar.style.background = player.stamina < 90 ? '#ff5252' : '#76ff03';
+    if (player.inPrisonRoom &&
+        (Math.floor(player.x / TILE_SIZE) < prisonRoom.left ||
+            Math.floor(player.x / TILE_SIZE) > prisonRoom.right ||
+            Math.floor(player.y / TILE_SIZE) < prisonRoom.top ||
+            Math.floor(player.y / TILE_SIZE) > prisonRoom.bottom)) {
+        player.inPrisonRoom = false;
     }
 }
 
-function triggerSound(x, y, maxRadius = 450) {
-    soundWaves.push({ x: x, y: y, radius: 10, maxRadius: maxRadius, alpha: 1, isFlash: false });
-    if (giraffe.ccTimer <= 0 && giraffe.state !== 'CHASE') {
+function triggerSound(x, y, maxRadius = 450, gridRange = 0, soundType = 'item') {
+    soundWaves.push({
+        x: x, y: y, radius: 10, maxRadius: maxRadius, alpha: 1, isFlash: false,
+        isFootstep: soundType === 'footstep', soundType: soundType,
+        gridRange: gridRange
+    });
+    let canHear;
+    if (soundType === 'door') {
+        let side = currentFloor * 30;
+        let left = Math.floor(x / TILE_SIZE) - Math.floor(side / 2);
+        let top = Math.floor(y / TILE_SIZE) - Math.floor(side / 2);
+        let enemyGridX = Math.floor(giraffe.x / TILE_SIZE);
+        let enemyGridY = Math.floor(giraffe.y / TILE_SIZE);
+        canHear = enemyGridX >= left && enemyGridX < left + side &&
+            enemyGridY >= top && enemyGridY < top + side;
+    } else if (gridRange > 0) {
+        canHear = Math.abs(Math.floor(giraffe.x / TILE_SIZE) - Math.floor(x / TILE_SIZE)) <= gridRange &&
+            Math.abs(Math.floor(giraffe.y / TILE_SIZE) - Math.floor(y / TILE_SIZE)) <= gridRange;
+    } else {
+        canHear = Math.hypot(giraffe.x - x, giraffe.y - y) <= maxRadius;
+    }
+    if (giraffe.ccTimer <= 0 && giraffe.state !== 'CHASE' && canHear) {
         giraffe.state = 'INVESTIGATE'; giraffe.targetX = x; giraffe.targetY = y; giraffe.path = []; giraffe.searchedRoom = false;
     }
 }
@@ -442,7 +1193,10 @@ function updateGiraffeAI() {
 
     let distToPlayer = Math.hypot(player.x - giraffe.x, player.y - giraffe.y);
     let isPlayerHidden = player.boxTimer > 0;
-    let canSeePlayer = !isPlayerHidden && (distToPlayer <= 375) && checkLineOfSight(giraffe.x, giraffe.y, player.x, player.y);
+    let angleToPlayer = Math.atan2(player.y - giraffe.y, player.x - giraffe.x);
+    let angleDifference = Math.atan2(Math.sin(angleToPlayer - giraffe.angle), Math.cos(angleToPlayer - giraffe.angle));
+    let canSeePlayer = !isPlayerHidden && distToPlayer <= 375 && Math.abs(angleDifference) <= Math.PI / 3 &&
+        checkLineOfSight(giraffe.x, giraffe.y, player.x, player.y);
 
     // 檢查是否有正在運作且引怪的放置類道具
     let activeDoll = deployedItems.find(i => i.type === 'DOLL' && !i.expired);
@@ -451,21 +1205,77 @@ function updateGiraffeAI() {
     }
 
     if (canSeePlayer) {
+        giraffe.lastSeenX = player.x;
+        giraffe.lastSeenY = player.y;
+        giraffe.lastSeenAngle = player.angle;
+        giraffe.lostPredictionSet = false;
+        if (giraffe.state === 'CHASE') {
+            giraffe.lostTimer = 0;
+            giraffe.lostTargetReached = false;
+        }
         giraffe.sightTimer += 1 / 60;
-        if (giraffe.sightTimer >= 0.15) { giraffe.state = 'CHASE'; giraffe.lostTimer = 0; }
+        if (giraffe.sightTimer >= 0.15) {
+            giraffe.state = 'CHASE';
+            giraffe.lostTimer = 0;
+            giraffe.lostTargetReached = false;
+        }
     } else {
         giraffe.sightTimer = Math.max(0, giraffe.sightTimer - 1/60);
         if (giraffe.state === 'CHASE') {
             giraffe.lostTimer += 1 / 60;
-            if (giraffe.lostTimer >= 3.0) {
-                giraffe.state = 'INVESTIGATE'; giraffe.targetX = player.x; giraffe.targetY = player.y; giraffe.path = []; giraffe.searchedRoom = false;
+            if (Math.hypot(player.x - giraffe.x, player.y - giraffe.y) <= 275 && !isPlayerHidden) {
+                let target = getClearGiraffeTarget(player.x, player.y);
+                giraffe.lostTargetX = player.x;
+                giraffe.lostTargetY = player.y;
+                giraffe.targetX = target.x;
+                giraffe.targetY = target.y;
+                giraffe.lostTimer = 0;
+                giraffe.lostTargetReached = true;
+            } else if (!giraffe.lostTargetReached) {
+                if (!giraffe.lostPredictionSet) {
+                    let predictionDistance = Math.min(player.speed * 15, TILE_SIZE);
+                    let predictedX, predictedY;
+                    do {
+                        predictedX = Math.max(player.size, Math.min(WORLD_WIDTH - player.size,
+                            giraffe.lastSeenX + Math.cos(giraffe.lastSeenAngle) * predictionDistance));
+                        predictedY = Math.max(player.size, Math.min(WORLD_HEIGHT - player.size,
+                            giraffe.lastSeenY + Math.sin(giraffe.lastSeenAngle) * predictionDistance));
+                        if (!checkWallCollision(predictedX, predictedY, giraffe.size)) break;
+                        predictionDistance = Math.max(0, predictionDistance - TILE_SIZE / 2);
+                    } while (predictionDistance > 0);
+                    let predictedTarget = getClearGiraffeTarget(predictedX, predictedY);
+                    giraffe.lostTargetX = predictedTarget.x;
+                    giraffe.lostTargetY = predictedTarget.y;
+                    giraffe.lostSearchIndex = 0;
+                    giraffe.lostPredictionSet = true;
+                }
+                giraffe.targetX = giraffe.lostTargetX;
+                giraffe.targetY = giraffe.lostTargetY;
+                if (Math.hypot(giraffe.x - giraffe.targetX, giraffe.y - giraffe.targetY) < 25) {
+                    giraffe.lostTargetReached = true;
+                    setNextLostSearchTarget();
+                }
+            } else if (Math.hypot(giraffe.x - giraffe.targetX, giraffe.y - giraffe.targetY) < 25) {
+                setNextLostSearchTarget();
+            }
+            if (giraffe.state === 'CHASE' && giraffe.lostTimer >= 5.0) {
+                giraffe.state = 'PATROL';
+                giraffe.sightTimer = 0;
+                giraffe.lostTimer = 0;
+                giraffe.lostTargetReached = false;
+                pickNextPatrolWaypoint();
             }
         }
     }
 
     let currentSpeed = giraffe.patrolSpeed;
     if (giraffe.state === 'CHASE') {
-        giraffe.targetX = player.x; giraffe.targetY = player.y; currentSpeed = giraffe.chaseSpeed;
+        if (canSeePlayer) {
+            let target = getClearGiraffeTarget(player.x, player.y);
+            giraffe.targetX = target.x;
+            giraffe.targetY = target.y;
+        }
+        currentSpeed = giraffe.chaseSpeed;
     } else if (giraffe.state === 'INVESTIGATE') {
         currentSpeed = giraffe.patrolSpeed * 1.3;
         if (Math.hypot(giraffe.x - giraffe.targetX, giraffe.y - giraffe.targetY) < 25) {
@@ -485,28 +1295,100 @@ function updateGiraffeAI() {
     }
 
     giraffe.pathTimer++;
-    if (giraffe.pathTimer % 15 === 0 || giraffe.path.length === 0) {
-        giraffe.path = findPath(Math.floor(giraffe.x/TILE_SIZE), Math.floor(giraffe.y/TILE_SIZE), Math.floor(giraffe.targetX/TILE_SIZE), Math.floor(giraffe.targetY/TILE_SIZE));
+    let pathGoalX = Math.floor(giraffe.targetX / TILE_SIZE);
+    let pathGoalY = Math.floor(giraffe.targetY / TILE_SIZE);
+    if (giraffe.pathTimer % 15 === 0 || giraffe.path.length === 0 ||
+        pathGoalX !== giraffe.pathGoalX || pathGoalY !== giraffe.pathGoalY) {
+        let route = findGiraffePath(Math.floor(giraffe.x/TILE_SIZE), Math.floor(giraffe.y/TILE_SIZE), pathGoalX, pathGoalY);
+        giraffe.path = route.path;
+        if (route.path.length > 0 && (route.x !== pathGoalX || route.y !== pathGoalY)) {
+            giraffe.targetX = route.x * TILE_SIZE + TILE_SIZE / 2;
+            giraffe.targetY = route.y * TILE_SIZE + TILE_SIZE / 2;
+            if (giraffe.state === 'CHASE' && !canSeePlayer) {
+                giraffe.lostTargetX = giraffe.targetX;
+                giraffe.lostTargetY = giraffe.targetY;
+            }
+        }
+        giraffe.pathGoalX = Math.floor(giraffe.targetX / TILE_SIZE);
+        giraffe.pathGoalY = Math.floor(giraffe.targetY / TILE_SIZE);
     }
 
-    let nextX = giraffe.targetX, nextY = giraffe.targetY;
+    let nextX = giraffe.x, nextY = giraffe.y;
     if (giraffe.path && giraffe.path.length > 1) {
-        nextX = giraffe.path[1][0] * TILE_SIZE + 25; nextY = giraffe.path[1][1] * TILE_SIZE + 25;
-        if (Math.hypot(giraffe.x - nextX, giraffe.y - nextY) < 6) giraffe.path.shift();
+        let [fromGridX, fromGridY] = giraffe.path[0];
+        let [toGridX, toGridY] = giraffe.path[1];
+        let waypointX = toGridX * TILE_SIZE + TILE_SIZE / 2;
+        let waypointY = toGridY * TILE_SIZE + TILE_SIZE / 2;
+        if (Math.hypot(giraffe.x - waypointX, giraffe.y - waypointY) < 6) {
+            giraffe.path.shift();
+            [fromGridX, fromGridY] = giraffe.path[0];
+            [toGridX, toGridY] = giraffe.path[1] || giraffe.path[0];
+        }
+        if (giraffe.path.length > 1) {
+            if (fromGridX !== toGridX) {
+                let rowCenterY = fromGridY * TILE_SIZE + TILE_SIZE / 2;
+                if (Math.abs(giraffe.y - rowCenterY) > 0.5) {
+                    nextY = rowCenterY;
+                } else {
+                    nextX = toGridX * TILE_SIZE + TILE_SIZE / 2;
+                }
+            } else {
+                let columnCenterX = fromGridX * TILE_SIZE + TILE_SIZE / 2;
+                if (Math.abs(giraffe.x - columnCenterX) > 0.5) {
+                    nextX = columnCenterX;
+                } else {
+                    nextY = toGridY * TILE_SIZE + TILE_SIZE / 2;
+                }
+            }
+        }
+    } else if (Math.floor(giraffe.x / TILE_SIZE) === Math.floor(giraffe.targetX / TILE_SIZE) &&
+        Math.floor(giraffe.y / TILE_SIZE) === Math.floor(giraffe.targetY / TILE_SIZE)) {
+        nextX = giraffe.targetX;
+        nextY = giraffe.targetY;
     }
 
-    let angle = Math.atan2(nextY - giraffe.y, nextX - giraffe.x);
-    giraffe.angle = angle;
-    giraffe.x += Math.cos(angle) * currentSpeed;
-    giraffe.y += Math.sin(angle) * currentSpeed;
+    let deltaX = nextX - giraffe.x, deltaY = nextY - giraffe.y;
+    let distance = Math.hypot(deltaX, deltaY);
+    let moved = false;
+    if (distance > 0) {
+        let stepX = (deltaX / distance) * Math.min(currentSpeed, distance);
+        let stepY = (deltaY / distance) * Math.min(currentSpeed, distance);
+        giraffe.angle = Math.atan2(deltaY, deltaX);
+        if (Math.abs(stepX) > 0.001 && !checkWallCollision(giraffe.x + stepX, giraffe.y, giraffe.size)) {
+            giraffe.x += stepX;
+            moved = true;
+        }
+        if (Math.abs(stepY) > 0.001 && !checkWallCollision(giraffe.x, giraffe.y + stepY, giraffe.size)) {
+            giraffe.y += stepY;
+            moved = true;
+        }
+        if (!moved) {
+            giraffe.path = [];
+            giraffe.pathGoalX = -1;
+            giraffe.pathGoalY = -1;
+        }
+    }
 
     let txt = "常態巡邏中 🌲";
     if (giraffe.state === 'INVESTIGATE') txt = giraffe.searchedRoom ? "🔍 深入盲區排查！" : "👂 前往可疑聲源...";
     if (giraffe.state === 'CHASE') txt = "🔥 發現目標！全力追殺中！";
+    if (giraffe.state === 'CHASE' && giraffe.lostTimer > 0 && showLostSightTimer.checked) {
+        txt += ` (${Math.min(giraffe.lostTimer, 5).toFixed(1)} / 5.0 秒)`;
+    }
     statusUI.innerText = "🦒 長頸鹿狀態: " + txt;
 }
 
 function pickNextPatrolWaypoint() {
+    if (currentFloor === 2) {
+        let cell = getRandomOpenCell(getOpenCells(), [giraffe]);
+        giraffe.waypointIndex++;
+        giraffe.targetX = cell.x;
+        giraffe.targetY = cell.y;
+        giraffe.path = [];
+        giraffe.pathGoalX = -1;
+        giraffe.pathGoalY = -1;
+        return;
+    }
     giraffe.waypointIndex = (giraffe.waypointIndex + Math.floor(Math.random() * 2 + 1)) % patrolWaypoints.length;
     giraffe.targetX = patrolWaypoints[giraffe.waypointIndex].x;
     giraffe.targetY = patrolWaypoints[giraffe.waypointIndex].y;
@@ -514,15 +1396,29 @@ function pickNextPatrolWaypoint() {
 }
 
 function update() {
-    if (gameState.over || gameState.won) return;
+    if (gameState.over || gameState.won || gameState.transition) return;
 
-    handleMovement();
+    if (player.inPrison) {
+        player.prisonTimer--;
+        if (player.prisonTimer <= 0) {
+            player.inPrison = false;
+            player.prisonTimer = 0;
+            showNotice('時間到！請從小黑屋右側出口自行離開。');
+        }
+    }
+
+    if (!player.inPrison) handleMovement();
+    updateRedJade();
     updateGiraffeAI();
+    if (player.inPrison) {
+        statusUI.innerText = `🔴 小黑屋：${Math.ceil(player.prisonTimer / 60)} 秒後解鎖`;
+    }
 
     // 縮減玩家狀態計時
     if (player.drinkTimer > 0) player.drinkTimer--;
     if (player.boxTimer > 0) player.boxTimer--;
     if (player.mysterySpeedTimer > 0) player.mysterySpeedTimer--;
+    if (player.itemNoiseTimer > 0) player.itemNoiseTimer--;
     if (gameNotice.timer > 0) gameNotice.timer--;
 
     // 無聲自動關門
@@ -573,7 +1469,14 @@ function update() {
 
     // 音波擴散
     for (let i = soundWaves.length - 1; i >= 0; i--) {
-        let wave = soundWaves[i]; wave.radius += 5; wave.alpha -= 0.015;
+        let wave = soundWaves[i];
+        if (wave.soundType === 'door' || wave.soundType === 'prison') {
+            wave.radius += wave.maxRadius / 90;
+            wave.alpha -= 1 / 90;
+        } else {
+            wave.radius += 5;
+            wave.alpha -= 0.015;
+        }
         if (wave.alpha <= 0 || wave.radius >= wave.maxRadius) soundWaves.splice(i, 1);
     }
 
@@ -602,9 +1505,20 @@ function update() {
     carryUI.style.color = player.carrying === 2 ? '#f44336' : '#ffeb3b';
     remainingCountUI.innerText = tablets.filter(t => !t.pickedUp).length;
     deliveredCountUI.innerText = centerZone.delivered;
+    deliveredTotalUI.innerText = tablets.length;
 
-    if (centerZone.delivered === tablets.length) { gameState.won = true; endGame("🎉 奇蹟生還！成功回收所有實驗數據平板！"); }
-    if (Math.hypot(player.x - giraffe.x, player.y - giraffe.y) < player.size + giraffe.size) { gameState.over = true; endGame("🦒 被長頸鹿正面撲倒了！實驗失敗。"); }
+    if (centerZone.delivered === tablets.length) {
+        if (currentFloor === 1) {
+            gameState.transition = true;
+            showNotice('💥 地板爆裂！正在墜入第二層…');
+            unlockSecondFloorAndContinue();
+        } else {
+            gameState.won = true;
+            endGame("🎉 成功回收第二層的所有實驗數據平板！");
+        }
+        return;
+    }
+    if (!player.inPrison && Math.hypot(player.x - giraffe.x, player.y - giraffe.y) < player.size + giraffe.size) { gameState.over = true; endGame("🦒 被長頸鹿正面撲倒了！實驗失敗。"); }
 }
 
 function draw() {
@@ -620,8 +1534,14 @@ function draw() {
                 ctx.strokeStyle = '#0a0a0f'; ctx.lineWidth = 1; ctx.strokeRect(rx, ry, TILE_SIZE, TILE_SIZE);
             } else if (mapGrid[r][c] === 2 || mapGrid[r][c] === 3) {
                 ctx.fillStyle = '#0f0f12'; ctx.fillRect(rx, ry, TILE_SIZE, TILE_SIZE);
-                ctx.fillStyle = mapGrid[r][c] === 2 ? '#b0bec5' : '#455a64'; 
-                ctx.fillRect(rx + 2, ry + 16, TILE_SIZE - 4, 18);
+                ctx.fillStyle = mapGrid[r][c] === 2 ? '#b0bec5' : '#455a64';
+                let horizontalPassage = c > 0 && c < mapGrid[r].length - 1 &&
+                    mapGrid[r][c - 1] !== 1 && mapGrid[r][c + 1] !== 1;
+                if (horizontalPassage) {
+                    ctx.fillRect(rx + 16, ry + 2, 18, TILE_SIZE - 4);
+                } else {
+                    ctx.fillRect(rx + 2, ry + 16, TILE_SIZE - 4, 18);
+                }
             } else {
                 ctx.fillStyle = '#0f0f12'; ctx.fillRect(rx, ry, TILE_SIZE, TILE_SIZE);
             }
@@ -651,12 +1571,43 @@ function draw() {
 
     // 畫音波/爆閃
     soundWaves.forEach(wave => {
+        if (wave.soundType === 'footstep' && !showFootstepRange.checked) return;
+        if (wave.soundType === 'door' && !showDoorSoundRange.checked) return;
+        if (wave.soundType === 'item' && !showItemSoundRange.checked) return;
         ctx.save();
+        if (wave.soundType === 'door') {
+            ctx.strokeStyle = 'rgba(176, 190, 197, 0.22)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 8]);
+            ctx.beginPath(); ctx.arc(wave.x, wave.y, wave.maxRadius, 0, Math.PI * 2); ctx.stroke();
+        } else if (wave.soundType === 'item') {
+            ctx.strokeStyle = 'rgba(255, 152, 0, 0.25)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 7]);
+            ctx.beginPath(); ctx.arc(wave.x, wave.y, wave.maxRadius, 0, Math.PI * 2); ctx.stroke();
+        } else if (wave.soundType === 'prison') {
+            ctx.strokeStyle = 'rgba(244, 67, 54, 0.2)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 8]);
+            ctx.beginPath(); ctx.arc(wave.x, wave.y, wave.maxRadius, 0, Math.PI * 2); ctx.stroke();
+        }
         ctx.strokeStyle = wave.isFlash ? `rgba(255,255,255,${wave.alpha})` : `rgba(255, 110, 64, ${wave.alpha})`;
         ctx.lineWidth = wave.isFlash ? 5 : 2; if(!wave.isFlash) ctx.setLineDash([6, 6]);
         ctx.beginPath(); ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI*2); ctx.stroke();
         ctx.restore();
     });
+
+    if (showFootstepRange.checked) {
+        let rangeX = Math.floor(player.x / TILE_SIZE) * TILE_SIZE - 2 * TILE_SIZE;
+        let rangeY = Math.floor(player.y / TILE_SIZE) * TILE_SIZE - 2 * TILE_SIZE;
+        ctx.fillStyle = 'rgba(255, 110, 64, 0.06)';
+        ctx.fillRect(rangeX, rangeY, 5 * TILE_SIZE, 5 * TILE_SIZE);
+        ctx.strokeStyle = 'rgba(255, 110, 64, 0.65)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 6]);
+        ctx.strokeRect(rangeX, rangeY, 5 * TILE_SIZE, 5 * TILE_SIZE);
+        ctx.setLineDash([]);
+    }
 
     // 安全區
     ctx.save(); ctx.shadowBlur = 15; ctx.shadowColor = '#00e5ff';
@@ -691,6 +1642,10 @@ function draw() {
 
     // 畫長頸鹿
     ctx.save(); ctx.translate(giraffe.x, giraffe.y); ctx.rotate(giraffe.angle);
+    if (showMonsterVision.checked) {
+        ctx.fillStyle = 'rgba(255, 167, 38, 0.08)';
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 375, -Math.PI/3, Math.PI/3); ctx.closePath(); ctx.fill();
+    }
     ctx.fillStyle = '#ffa726'; ctx.beginPath(); ctx.ellipse(0, 0, giraffe.size * 1.2, giraffe.size, 0, 0, Math.PI * 2); ctx.fill(); 
     ctx.fillStyle = '#5d4037'; ctx.beginPath(); ctx.arc(-8, -6, 5, 0, Math.PI*2); ctx.arc(6, 6, 5, 0, Math.PI*2); ctx.fill(); 
     ctx.fillStyle = '#ffa726'; ctx.fillRect(10, -6, 30, 12); 
@@ -699,6 +1654,62 @@ function draw() {
     ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(44, -3, 1.5, 0, Math.PI*2); ctx.arc(44, 4, 1.5, 0, Math.PI*2); ctx.fill();
     if (giraffe.state === 'CHASE' && giraffe.ccTimer <= 0) { ctx.fillStyle = 'rgba(255, 0, 0, 0.45)'; ctx.beginPath(); ctx.arc(38, 0, 16, 0, Math.PI*2); ctx.fill(); }
     ctx.restore();
+
+    if (redJade) {
+        ctx.save(); ctx.translate(redJade.x, redJade.y); ctx.rotate(redJade.angle);
+        if (showMonsterVision.checked) {
+            ctx.fillStyle = 'rgba(244, 67, 54, 0.08)';
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 375, -Math.PI / 3, Math.PI / 3); ctx.closePath(); ctx.fill();
+        }
+        ctx.shadowBlur = 18; ctx.shadowColor = '#f44336';
+        ctx.fillStyle = '#c62828';
+        ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(5, -15); ctx.lineTo(-14, -10);
+        ctx.lineTo(-20, 0); ctx.lineTo(-14, 10); ctx.lineTo(5, 15); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#ff8a80';
+        ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(5, -15); ctx.lineTo(2, 0); ctx.lineTo(5, 15); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(8, -4, 2.5, 0, Math.PI * 2); ctx.arc(8, 4, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+    }
+
+    if (player.inPrison) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.94)';
+        ctx.fillRect(prisonRoom.x - 170, prisonRoom.y - 132, 340, 264);
+        ctx.strokeStyle = '#546e7a';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(prisonRoom.x - 170, prisonRoom.y - 132, 340, 264);
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ff5252';
+        ctx.font = 'bold 22px Arial';
+        ctx.fillText('小黑屋', prisonRoom.x, prisonRoom.y - 99);
+        ctx.fillStyle = '#fff';
+        ctx.font = '13px Arial';
+        ctx.fillText(`第 ${currentFloor} 層敵人資料`, prisonRoom.x, prisonRoom.y - 70);
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#ffcc80';
+        ctx.fillText('🦒 長頸鹿：120° 視野；看見玩家後高速追擊。', prisonRoom.x - 150, prisonRoom.y - 38);
+        if (currentFloor === 2) {
+            ctx.fillStyle = '#ff8a80';
+            ctx.fillText('🔴 紅玉：巡邏時與玩家同速；看見奔跑或用道具', prisonRoom.x - 150, prisonRoom.y - 12);
+            ctx.fillText('會以 1.5 倍速追擊；每次收押增加 5 秒。', prisonRoom.x - 150, prisonRoom.y + 9);
+        }
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#80deea';
+        ctx.font = 'bold 18px Arial';
+        ctx.fillText(`${Math.ceil(player.prisonTimer / 60)} 秒後解鎖`, prisonRoom.x, prisonRoom.y + 55);
+        ctx.font = '12px Arial';
+        ctx.fillText('時間到後，從右側出口自行離開 →', prisonRoom.x, prisonRoom.y + 78);
+        ctx.restore();
+    }
+    if (player.inPrisonRoom && !player.inPrison) {
+        ctx.save();
+        ctx.fillStyle = '#76ff03';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('出口 →', (prisonRoom.right + 1) * TILE_SIZE + TILE_SIZE / 2,
+            prisonRoom.exitY * TILE_SIZE + TILE_SIZE / 2);
+        ctx.restore();
+    }
 
     ctx.restore();
 
@@ -712,15 +1723,74 @@ function draw() {
 }
 
 function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
-function startGame() { mainMenu.style.display = 'none'; messageScreen.style.display = 'none'; initGame(); }
-function endGame(msg) { messageScreen.style.display = 'flex'; messageText.innerHTML = msg; messageText.style.color = gameState.won ? '#4CAF50' : '#f44336'; }
-function backToMenu() { messageScreen.style.display = 'none'; mainMenu.style.display = 'flex'; }
+function startGame(floor = 1) {
+    if (!currentAccount) {
+        setAccountStatus('請先登入雲端存檔。', true);
+        return;
+    }
+    if (floor > unlockedFloor) {
+        setAccountStatus('此樓層尚未解鎖。', true);
+        return;
+    }
+    mainMenu.style.display = 'none';
+    messageScreen.style.display = 'none';
+    hideMessageAction();
+    initGame(floor);
+}
+function endGame(msg) {
+    hideMessageAction();
+    messageScreen.style.display = 'flex';
+    messageText.innerHTML = msg;
+    messageText.style.color = gameState.won ? '#4CAF50' : '#f44336';
+}
+function backToMenu() {
+    hideMessageAction();
+    messageScreen.style.display = 'none';
+    mainMenu.style.display = 'flex';
+}
+
+accountLoginButton.addEventListener('click', loginAccount);
+accountLogoutButton.addEventListener('click', logoutAccount);
+accountNameInput.addEventListener('keydown', event => {
+    if (event.key === 'Enter') loginAccount();
+});
+floor1Button.addEventListener('click', () => startGame(1));
+floor2Button.addEventListener('click', () => startGame(2));
 
 window.addEventListener('keydown', e => {
-    keys[e.key.toLowerCase()] = true;
-    if (e.key === ' ' || e.key.toLowerCase() === 'e') { e.preventDefault(); useCurrentItem(); }
+    if (typeof e.key !== 'string') return;
+    let key = e.key.toLowerCase();
+    keys[key] = true;
+    if (e.key === ' ' || key === 'e') { e.preventDefault(); useCurrentItem(); }
 });
-window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+window.addEventListener('keyup', e => {
+    if (typeof e.key !== 'string') return;
+    let key = e.key.toLowerCase();
+    keys[key] = false;
+    if (key === 'shift' && player) player.sprintExhausted = false;
+});
+runBtn.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    touchSprintActive = true;
+    runBtn.classList.add('active');
+    runBtn.setPointerCapture(event.pointerId);
+});
+runBtn.addEventListener('pointerup', () => {
+    touchSprintActive = false;
+    runBtn.classList.remove('active');
+    if (player) player.sprintExhausted = false;
+});
+runBtn.addEventListener('pointercancel', () => {
+    touchSprintActive = false;
+    runBtn.classList.remove('active');
+    if (player) player.sprintExhausted = false;
+});
+window.addEventListener('blur', () => {
+    keys = {};
+    touchSprintActive = false;
+    runBtn.classList.remove('active');
+    if (player) player.sprintExhausted = false;
+});
 
 joystickContainer.addEventListener('touchstart', e => {
     joystick.active = true; const rect = joystickContainer.getBoundingClientRect();
