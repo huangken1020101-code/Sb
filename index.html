@@ -24,14 +24,14 @@
         }
         #mainMenu h1 { font-size: 1.8rem; color: #ff9800; text-shadow: 0 0 15px rgba(255,152,0,0.6); margin-bottom: 5px; text-align: center; }
         #mainMenu p { font-size: 0.85rem; color: #bbb; margin-bottom: 20px; text-align: center; padding: 0 20px; line-height: 1.5; }
-        #displaySettings {
+        #displaySettings, #gameModeSettings {
             display: grid; gap: 10px; margin: 0 20px 20px; padding: 14px 18px;
             color: #eee; font-size: 0.9rem; background: rgba(0,0,0,0.65);
             border: 1px solid rgba(255,152,0,0.45); border-radius: 10px;
         }
-        #displaySettings h2 { margin: 0 0 2px; color: #ffb74d; font-size: 1rem; text-align: center; }
-        #displaySettings label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-        #displaySettings input { width: 16px; height: 16px; accent-color: #ff9800; cursor: pointer; }
+        #displaySettings h2, #gameModeSettings h2 { margin: 0 0 2px; color: #ffb74d; font-size: 1rem; text-align: center; }
+        #displaySettings label, #gameModeSettings label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        #displaySettings input, #gameModeSettings input { width: 16px; height: 16px; accent-color: #ff9800; cursor: pointer; }
         #accountPanel, #floorSelect {
             display: grid; gap: 8px; width: min(90%, 420px); margin: 0 20px 12px;
             padding: 12px 16px; background: rgba(0,0,0,0.72);
@@ -50,8 +50,8 @@
         #accountWarning { color: #ffcc80; }
         #accountStatus { color: #80deea; min-height: 1em; }
         #accountPanel .btn, #floorSelect .btn { padding: 8px 14px; font-size: 0.9rem; }
-        #floorButtons { display: flex; justify-content: center; gap: 10px; }
-        #floor2Button:disabled { background: #555; cursor: not-allowed; box-shadow: none; transform: none; }
+        #floorButtons { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; }
+        #floorSelect .btn:disabled { background: #555; cursor: not-allowed; box-shadow: none; transform: none; }
         #accountLogout { display: none; }
         .btn {
             padding: 12px 40px; font-size: 1.1rem; font-weight: bold; background: #b71c1c;
@@ -80,6 +80,28 @@
             align-items: center; justify-content: center; z-index: 5;
         }
         #messageText { font-size: 2rem; font-weight: bold; margin-bottom: 25px; text-align: center; padding: 0 10px; }
+        #wordMatchScreen {
+            position: absolute; inset: 0; z-index: 6; display: none; flex-direction: column;
+            align-items: center; justify-content: center; gap: 12px; padding: 20px;
+            background: rgba(8, 10, 18, 0.78); text-align: center; pointer-events: none;
+        }
+        #wordMatchScreen > * { pointer-events: auto; }
+        #wordMatchScreen h2 { margin: 0; color: #ffcc80; }
+        #wordMatchPrompt { margin: 0; color: #ddd; }
+        #wordMatchGrid {
+            display: flex; flex-direction: column; gap: 8px;
+            width: min(100%, 560px); overflow-x: auto;
+        }
+        .wordMatchRow {
+            display: grid; grid-template-columns: repeat(5, minmax(56px, 1fr)); gap: 8px;
+        }
+        .wordMatchCard {
+            min-width: 0; min-height: 48px; padding: 8px 4px; color: white; background: #263238;
+            border: 1px solid #607d8b; border-radius: 8px; font-size: clamp(0.78rem, 3vw, 1rem); cursor: pointer;
+        }
+        .wordMatchCard.selected { background: #1565c0; border-color: #90caf9; }
+        .wordMatchCard.matched { background: #1b5e20; border-color: #81c784; }
+        .wordMatchCard:disabled { opacity: 1; cursor: default; }
 
         /* 手機虛擬搖桿與道具鈕 */
         #joystickContainer {
@@ -132,6 +154,7 @@
                 <div id="floorButtons">
                     <button id="floor1Button" class="btn" type="button">第一層</button>
                     <button id="floor2Button" class="btn" type="button" disabled>第二層（尚未解鎖）</button>
+                    <button id="floor3Button" class="btn" type="button" disabled>第三層（尚未解鎖）</button>
                 </div>
             </section>
             <section id="displaySettings" aria-label="顯示設定">
@@ -141,6 +164,12 @@
                 <label><input id="showDoorSoundRange" type="checkbox" checked>顯示開門聲音範圍</label>
                 <label><input id="showItemSoundRange" type="checkbox" checked>顯示道具聲音範圍</label>
                 <label><input id="showLostSightTimer" type="checkbox" checked>顯示脫離視野追逐時間</label>
+            </section>
+            <section id="gameModeSettings" aria-label="遊戲模式">
+                <h2>遊戲模式（可不選，最多選一種）</h2>
+                <label><input class="gameMode" type="checkbox" value="easy">簡單：首次被長頸鹿抓到不死亡並暈眩 3 秒；怪物速度 0.8 倍、玩家速度 1.3 倍、聲音範圍減半</label>
+                <label><input class="gameMode" type="checkbox" value="hard">困難：體力上限減半；怪物速度 1.3 倍、玩家速度 0.9 倍、聲音範圍 1.2 倍</label>
+                <label><input class="gameMode" type="checkbox" value="hell">地域模式：無法奔跑；怪物速度 1.5 倍、玩家速度 0.85 倍、聲音範圍 1.25 倍</label>
             </section>
         </div>
 
@@ -162,6 +191,12 @@
             <div id="messageText">遊戲結束</div>
             <button id="messageActionButton" class="btn" type="button" style="display:none; margin-bottom: 12px;"></button>
             <button class="btn" onclick="backToMenu()">返回主選單</button>
+        </div>
+        <div id="wordMatchScreen" role="dialog" aria-modal="true" aria-labelledby="wordMatchTitle">
+            <h2 id="wordMatchTitle">邪惡貝殼：英文單詞配對</h2>
+            <p id="wordMatchPrompt"></p>
+            <div id="wordMatchGrid"></div>
+            <p id="wordMatchStatus" role="status"></p>
         </div>
 
         <div id="joystickContainer"><div id="joystickStick"></div></div>
@@ -185,6 +220,7 @@ const showFootstepRange = document.getElementById('showFootstepRange');
 const showDoorSoundRange = document.getElementById('showDoorSoundRange');
 const showItemSoundRange = document.getElementById('showItemSoundRange');
 const showLostSightTimer = document.getElementById('showLostSightTimer');
+const gameModeInputs = Array.from(document.querySelectorAll('.gameMode'));
 const accountNameInput = document.getElementById('accountName');
 const accountDomainSelect = document.getElementById('accountDomain');
 const accountStatusUI = document.getElementById('accountStatus');
@@ -196,7 +232,13 @@ const accountLogoutButton = document.getElementById('accountLogout');
 const floorSelect = document.getElementById('floorSelect');
 const floor1Button = document.getElementById('floor1Button');
 const floor2Button = document.getElementById('floor2Button');
+const floor3Button = document.getElementById('floor3Button');
 const messageActionButton = document.getElementById('messageActionButton');
+const wordMatchScreen = document.getElementById('wordMatchScreen');
+const wordMatchTitle = document.getElementById('wordMatchTitle');
+const wordMatchPrompt = document.getElementById('wordMatchPrompt');
+const wordMatchGrid = document.getElementById('wordMatchGrid');
+const wordMatchStatus = document.getElementById('wordMatchStatus');
 
 const carryUI = document.getElementById('carryUI');
 const floorUI = document.getElementById('floorUI');
@@ -250,16 +292,44 @@ let WORLD_HEIGHT = 31 * TILE_SIZE;
 
 let player, giraffe, centerZone, tablets, gameState, soundWaves = [];
 let itemBoxes = [], deployedItems = [];
-let redJade = null, prisonRoom = null;
+let redJade = null, evilShell = null, prisonRoom = null;
 let secondFloorRooms = [];
 let currentFloor = 1, unlockedFloor = 1, currentAccount = "";
 let levelMapRows = mapTemplate.length, redJadeCaptureCount = 0;
+let quizState = null;
 let camX = 0, camY = 0;
 let keys = {};
 let joystick = { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0 };
 let touchSprintActive = false;
 let doorTimers = {};
 let gameNotice = { text: "", timer: 0 };
+let selectedGameMode = "";
+let easyModeFirstHitUsed = false;
+
+const gameModeSettings = {
+    easy: { playerSpeed: 1.3, monsterSpeed: 0.8, soundRange: 0.5, staminaMax: 450 },
+    hard: { playerSpeed: 0.9, monsterSpeed: 1.3, soundRange: 1.2, staminaMax: 225 },
+    hell: { playerSpeed: 0.85, monsterSpeed: 1.5, soundRange: 1.25, staminaMax: 450 }
+};
+
+function getModeSetting(key) {
+    return gameModeSettings[selectedGameMode]?.[key] ?? 1;
+}
+
+function getStaminaMaximum() {
+    return gameModeSettings[selectedGameMode]?.staminaMax ?? 450;
+}
+
+function selectGameMode(mode) {
+    selectedGameMode = mode;
+    gameModeInputs.forEach(input => { input.checked = input.value === mode; });
+    runBtn.disabled = mode === 'hell';
+    if (mode === 'hell') {
+        keys['shift'] = false;
+        touchSprintActive = false;
+        runBtn.classList.remove('active');
+    }
+}
 
 // 道具權重池
 const itemPool = [
@@ -291,7 +361,44 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     runBtn.style.display = 'block';
 }
 
+function generateThirdFloorTemplate() {
+    const columns = 50, rows = 52;
+    const cells = Array.from({ length: rows }, () => Array(columns).fill(1));
+    const roomColumns = [10, 23, 36];
+    const roomRows = [2, 14, 26, 38];
+    secondFloorRooms = roomRows.flatMap(top => roomColumns.map(left => ({
+        left, right: left + 9, top, bottom: top + 8
+    })));
+
+    secondFloorRooms.forEach(room => {
+        for (let y = room.top + 1; y < room.bottom; y++) {
+            for (let x = room.left + 1; x < room.right; x++) cells[y][x] = 0;
+        }
+    });
+
+    const roomCenters = roomColumns.map(left => left + 4);
+    [11, 12, 23, 24, 35, 36].forEach(y => {
+        for (let x = 7; x < columns - 2; x++) cells[y][x] = 0;
+    });
+    secondFloorRooms.forEach((room, index) => {
+        const rowIndex = Math.floor(index / roomColumns.length);
+        const x = roomCenters[index % roomColumns.length];
+        if (rowIndex > 0) {
+            cells[room.top][x] = 2;
+            for (let y = room.top - 2; y < room.top; y++) cells[y][x] = 0;
+        }
+        if (rowIndex < roomRows.length - 1) {
+            cells[room.bottom][x] = 2;
+            cells[room.bottom + 1][x] = 0;
+        }
+    });
+
+    return cells.map(row => row.join(""));
+}
+
 function generateSecondFloorTemplate() {
+    if (currentFloor === 3) return generateThirdFloorTemplate();
+
     const columns = 41, rows = 31;
     let cells = Array.from({ length: rows }, () => Array(columns).fill(1));
     secondFloorRooms = [
@@ -304,6 +411,10 @@ function generateSecondFloorTemplate() {
         { left: 15, right: 23, top: 24, bottom: 29 },
         { left: 29, right: 37, top: 24, bottom: 29 }
     ];
+    secondFloorRooms.push(
+        { left: 10, right: 14, top: 12, bottom: 18 },
+        { left: 24, right: 28, top: 12, bottom: 18 }
+    );
     const carve = (x, y) => { cells[y][x] = 0; };
     const carveHorizontal = (x1, x2, y) => {
         for (let x = x1; x <= x2; x++) carve(x, y);
@@ -335,19 +446,24 @@ function generateSecondFloorTemplate() {
     carveVertical(33, 20, 24);
     carveHorizontal(8, 14, 26);
     carveVertical(9, 21, 26);
+    carveVertical(12, 18, 20);
+    carveVertical(26, 10, 12);
 
     // Put doors only in room boundaries; corridor junctions remain open.
     [[5, 7], [18, 7], [31, 7], [18, 12], [33, 12],
         [18, 18], [33, 18], [18, 24], [33, 24], [8, 26]].forEach(([x, y]) => {
             cells[y][x] = 2;
         });
+    [[12, 18], [26, 12]].forEach(([x, y]) => { cells[y][x] = 2; });
     return cells.map(row => row.join(""));
 }
 
 function addPrisonRoom() {
-    const bounds = currentFloor === 2
-        ? { left: 2, right: 8, top: 12, bottom: 18, exitY: 15 }
-        : { left: 2, right: 8, top: 14, bottom: 19, exitY: 16 };
+    const bounds = currentFloor === 3
+        ? { left: 2, right: 7, top: 20, bottom: 26, exitY: 23 }
+        : currentFloor === 2
+            ? { left: 2, right: 8, top: 12, bottom: 18, exitY: 15 }
+            : { left: 2, right: 8, top: 14, bottom: 19, exitY: 16 };
     for (let y = bounds.top; y <= bounds.bottom; y++) {
         for (let x = bounds.left; x <= bounds.right; x++) {
             mapGrid[y][x] = x === bounds.left || x === bounds.right || y === bounds.top || y === bounds.bottom ? 1 : 0;
@@ -355,19 +471,23 @@ function addPrisonRoom() {
     }
     mapGrid[bounds.exitY][bounds.right] = 2;
     mapGrid[bounds.exitY][bounds.right + 1] = 0;
-    if (currentFloor === 2) {
+    if (currentFloor === 3) {
+        for (let y = bounds.exitY - 2; y <= bounds.exitY + 1; y++) {
+            mapGrid[y][bounds.right + 1] = 0;
+        }
+    } else if (currentFloor === 2) {
         for (let y = 13; y <= 19; y++) mapGrid[y][9] = 0;
     }
     prisonRoom = {
         ...bounds,
-        x: 5 * TILE_SIZE + TILE_SIZE / 2,
-        y: Math.floor((bounds.top + bounds.bottom) / 2) * TILE_SIZE + TILE_SIZE / 2
+        x: Math.round((bounds.left + bounds.right) / 2) * TILE_SIZE + TILE_SIZE / 2,
+        y: Math.round((bounds.top + bounds.bottom) / 2) * TILE_SIZE + TILE_SIZE / 2
     };
 }
 
 function parseMap(floor = 1) {
     currentFloor = floor;
-    let template = floor === 2 ? generateSecondFloorTemplate() : mapTemplate;
+    let template = floor >= 2 ? generateSecondFloorTemplate() : mapTemplate;
     levelMapRows = template.length;
     mapGrid = template.map(row => Array.from(row, Number));
     addPrisonRoom();
@@ -466,6 +586,8 @@ function setLoggedInAccount(account, highestFloor) {
     floorSelect.hidden = false;
     floor2Button.disabled = unlockedFloor < 2;
     floor2Button.innerText = unlockedFloor >= 2 ? '第二層' : '第二層（尚未解鎖）';
+    floor3Button.disabled = unlockedFloor < 3;
+    floor3Button.innerText = unlockedFloor >= 3 ? '第三層' : '第三層（尚未解鎖）';
     setAccountStatus(`已連線；目前可選擇至第 ${unlockedFloor} 層。`);
 }
 
@@ -485,7 +607,7 @@ async function loginAccount() {
     try {
         let document = await getCloudAccount(account);
         let storedFloor = document ? Number(document.fields?.unlockedFloor?.integerValue || 1) : 1;
-        let highestFloor = storedFloor === 2 ? 2 : 1;
+        let highestFloor = Math.max(1, Math.min(3, Number.isInteger(storedFloor) ? storedFloor : 1));
         if (!document) await saveCloudProgress(account, highestFloor);
         setLoggedInAccount(account, highestFloor);
     } catch (error) {
@@ -517,20 +639,22 @@ function hideMessageAction() {
     messageActionButton.onclick = null;
 }
 
-async function unlockSecondFloorAndContinue() {
+async function unlockNextFloorAndContinue(nextFloor = currentFloor + 1) {
     messageScreen.style.display = 'none';
     hideMessageAction();
     try {
-        await saveCloudProgress(currentAccount, 2);
-        unlockedFloor = 2;
-        floor2Button.disabled = false;
-        floor2Button.innerText = '第二層';
-        showNotice('地板爆裂！正在墜入第二層迷宮…');
-        setTimeout(() => startGame(2), 1200);
+        await saveCloudProgress(currentAccount, nextFloor);
+        unlockedFloor = Math.max(unlockedFloor, nextFloor);
+        floor2Button.disabled = unlockedFloor < 2;
+        floor2Button.innerText = unlockedFloor >= 2 ? '第二層' : '第二層（尚未解鎖）';
+        floor3Button.disabled = unlockedFloor < 3;
+        floor3Button.innerText = unlockedFloor >= 3 ? '第三層' : '第三層（尚未解鎖）';
+        showNotice(`地板爆裂！正在墜入第 ${nextFloor} 層迷宮…`);
+        setTimeout(() => startGame(nextFloor, true), 1200);
     } catch (error) {
-        messageText.innerText = `第二層解鎖存檔失敗：${error.message}`;
+        messageText.innerText = `第 ${nextFloor} 層解鎖存檔失敗：${error.message}`;
         messageScreen.style.display = 'flex';
-        showMessageAction('重試雲端存檔', unlockSecondFloorAndContinue);
+        showMessageAction('重試雲端存檔', () => unlockNextFloorAndContinue(nextFloor));
     }
 }
 
@@ -541,7 +665,7 @@ function getRandomOpenCell(cells, minimumDistanceFrom = []) {
     return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
-function initializeSecondFloor() {
+function initializeAdvancedFloor() {
     let openCells = getOpenCells();
     let playerCell = getNearestOpenCell(75, 75, openCells);
     let centerCell = getNearestOpenCell(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, openCells);
@@ -563,21 +687,35 @@ function initializeSecondFloor() {
     giraffe.lostTargetY = giraffe.y;
     giraffe.waypointIndex = 0;
 
-    let jadeCell = getRandomOpenCell(openCells, [player, centerZone, giraffe]);
-    let jadeNeighbors = [[1,0],[0,1],[-1,0],[0,-1]];
-    let facing = jadeNeighbors.find(([dx, dy]) => {
-        let x = (jadeCell.gridX + dx) * TILE_SIZE + TILE_SIZE / 2;
-        let y = (jadeCell.gridY + dy) * TILE_SIZE + TILE_SIZE / 2;
-        return !checkWallCollision(x, y, 4);
-    }) || [1,0];
-    redJade = {
-        x: jadeCell.x, y: jadeCell.y, angle: Math.atan2(facing[1], facing[0]), size: 20,
-        targetX: jadeCell.x, targetY: jadeCell.y, path: [], pathTimer: 0,
-        pathGoalX: -1, pathGoalY: -1, waypointIndex: 0, alertedTimer: 0,
-        lastSeenX: jadeCell.x, lastSeenY: jadeCell.y
-    };
+    let jadeCell = null;
+    if (currentFloor >= 2) {
+        jadeCell = getRandomOpenCell(openCells, [player, centerZone, giraffe]);
+        let jadeNeighbors = [[1,0],[0,1],[-1,0],[0,-1]];
+        let facing = jadeNeighbors.find(([dx, dy]) => {
+            let x = (jadeCell.gridX + dx) * TILE_SIZE + TILE_SIZE / 2;
+            let y = (jadeCell.gridY + dy) * TILE_SIZE + TILE_SIZE / 2;
+            return !checkWallCollision(x, y, 4);
+        }) || [1,0];
+        redJade = {
+            x: jadeCell.x, y: jadeCell.y, angle: Math.atan2(facing[1], facing[0]), size: 20,
+            targetX: jadeCell.x, targetY: jadeCell.y, path: [], pathTimer: 0,
+            pathGoalX: -1, pathGoalY: -1, waypointIndex: 0, alertedTimer: 0,
+            lastSeenX: jadeCell.x, lastSeenY: jadeCell.y
+        };
+    }
+    if (currentFloor === 3) {
+        let shellCell = getRandomOpenCell(openCells, [player, centerZone, giraffe, redJade]);
+        evilShell = {
+            x: shellCell.x, y: shellCell.y, size: 22, angle: 0,
+            targetX: shellCell.x, targetY: shellCell.y, path: [], pathTimer: 0,
+            pathGoalX: -1, pathGoalY: -1, cooldownUntil: 0, alertedTimer: 0,
+            lastSeenX: shellCell.x, lastSeenY: shellCell.y
+        };
+    }
 
-    let used = [playerCell, centerCell, giraffeCell, jadeCell];
+    let used = [playerCell, centerCell, giraffeCell];
+    if (jadeCell) used.push(jadeCell);
+    if (evilShell) used.push(evilShell);
     tablets = [];
     for (let room of secondFloorRooms.filter(room => !(room.left === prisonRoom.left &&
         room.right === prisonRoom.right && room.top === prisonRoom.top && room.bottom === prisonRoom.bottom))) {
@@ -627,19 +765,24 @@ function initGame(floor = 1) {
     doorTimers = {};
     deployedItems = [];
     redJade = null;
+    evilShell = null;
+    quizState = null;
+    gameState.quizActive = false;
+    wordMatchScreen.style.display = 'none';
     redJadeCaptureCount = 0;
     gameNotice = { text: "", timer: 0 };
     
     // 玩家
     player = { 
         x: WORLD_WIDTH / 2, y: (levelMapRows * TILE_SIZE) / 2 + 50, size: 14, 
-        baseSpeed: 4.1, speed: 4.1, carrying: 0, angle: -Math.PI/2,
+        baseSpeed: 4.1, speed: 4.1 * getModeSetting('playerSpeed'), carrying: 0, angle: -Math.PI/2,
         item: null, drinkTimer: 0, boxTimer: 0, mysterySpeedTimer: 0,
         soundGridX: Math.floor((WORLD_WIDTH / 2) / TILE_SIZE),
         soundGridY: Math.floor(((levelMapRows * TILE_SIZE) / 2 + 50) / TILE_SIZE),
         isMoving: false, itemNoiseTimer: 0, inPrison: false, prisonTimer: 0,
-        inPrisonRoom: false, stamina: 450, sprintRecoveryDelay: 0,
-        sprintExhausted: false, isRunning: false, savedX: 0, savedY: 0
+        inPrisonRoom: false, stamina: getStaminaMaximum(), sprintRecoveryDelay: 0,
+        sprintExhausted: false, isRunning: false, savedX: 0, savedY: 0,
+        easyModeGraceTimer: 0
     };
     
     // 長頸鹿
@@ -680,8 +823,8 @@ function initGame(floor = 1) {
             { x: 20*50+25, y: 26*50+25, item: getRandomItem(), active: true }
         ];
     } else {
-        floorUI.innerText = '📍 樓層: 第二層';
-        initializeSecondFloor();
+        floorUI.innerText = `📍 樓層: 第${floor === 2 ? '二' : '三'}層`;
+        initializeAdvancedFloor();
     }
 
     warningUI.style.display = 'none';
@@ -881,9 +1024,9 @@ function getThrowPoint(sx, sy, angle, maxDist) {
 }
 
 function useCurrentItem() {
-    if (!player.item || gameState.over || gameState.won || player.inPrison) return;
+    if (!player.item || gameState.over || gameState.won || player.inPrison || gameState.quizActive) return;
     let type = player.item.type;
-    if (currentFloor === 2) player.itemNoiseTimer = 20;
+    if (currentFloor >= 2) player.itemNoiseTimer = 20;
     showNotice(`使用了 【${player.item.name}】`);
 
     if (type === 'CAN') {
@@ -899,8 +1042,9 @@ function useCurrentItem() {
         deployedItems.push({ x: player.x, y: player.y, type: 'ALARM', timer: 900, expired: false });
     } else if (type === 'STROBE') {
         let pt = getThrowPoint(player.x, player.y, player.angle, 150);
-        soundWaves.push({ x: pt.x, y: pt.y, radius: 10, maxRadius: 200, alpha: 1, isFlash: true });
-        if (Math.hypot(giraffe.x - pt.x, giraffe.y - pt.y) < 200) {
+        let flashRange = 200 * getModeSetting('soundRange');
+        soundWaves.push({ x: pt.x, y: pt.y, radius: 10, maxRadius: flashRange, alpha: 1, isFlash: true });
+        if (Math.hypot(giraffe.x - pt.x, giraffe.y - pt.y) < flashRange) {
             giraffe.ccTimer = 300; giraffe.ccType = 'STROBE'; giraffe.path = [];
         }
     } else if (type === 'DOLL') {
@@ -924,6 +1068,179 @@ function canEnemySeePlayer(enemy) {
     let angleDifference = Math.atan2(Math.sin(angleToPlayer - enemy.angle), Math.cos(angleToPlayer - enemy.angle));
     return player.boxTimer <= 0 && distance <= 375 && Math.abs(angleDifference) <= Math.PI / 3 &&
         checkLineOfSight(enemy.x, enemy.y, player.x, player.y);
+}
+
+const easyEnglishPairs = [
+    { zh: '蘋果', en: 'apple' }, { zh: '書', en: 'book' }, { zh: '貓', en: 'cat' },
+    { zh: '狗', en: 'dog' }, { zh: '水', en: 'water' }, { zh: '太陽', en: 'sun' },
+    { zh: '紅色', en: 'red' }, { zh: '朋友', en: 'friend' }, { zh: '牛奶', en: 'milk' },
+    { zh: '魚', en: 'fish' }, { zh: '房子', en: 'house' }, { zh: '跑', en: 'run' },
+    { zh: '大', en: 'big' }, { zh: '快樂', en: 'happy' }, { zh: '學校', en: 'school' },
+    { zh: '小', en: 'small' }, { zh: '黃色', en: 'yellow' }, { zh: '鳥', en: 'bird' },
+    { zh: '手', en: 'hand' }, { zh: '食物', en: 'food' }
+];
+
+function shuffle(items) {
+    let shuffled = items.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+function beginShellWordQuiz() {
+    gameState.quizActive = true;
+    evilShell.cooldownUntil = Date.now() + 60000 / currentFloor;
+    triggerSound(evilShell.x, evilShell.y, 0,
+        20 * currentFloor * getModeSetting('soundRange'), 'shell');
+    keys = {};
+    touchSprintActive = false;
+    runBtn.classList.remove('active');
+    joystick.active = false;
+    joystick.moveX = 0;
+    joystick.moveY = 0;
+    joystickStick.style.transform = 'translate(0px, 0px)';
+    quizState = { matched: new Set(), selected: null, pairs: [] };
+    wordMatchScreen.style.display = 'flex';
+    setupWordMatchRound();
+}
+
+function setupWordMatchRound() {
+    if (!quizState) return;
+    quizState.pairs = shuffle(easyEnglishPairs).slice(0, 5);
+    quizState.matched = new Set();
+    quizState.selected = null;
+    wordMatchTitle.innerText = '邪惡貝殼：單字配對';
+    wordMatchPrompt.innerText = '配對 5 組中文與英文單詞';
+    wordMatchStatus.innerText = '依序選取一個中文和一個英文單詞。';
+    const rows = [
+        { language: 'zh', words: shuffle(quizState.pairs.map((pair, index) =>
+            ({ text: pair.zh, pairIndex: index }))) },
+        { language: 'en', words: shuffle(quizState.pairs.map((pair, index) =>
+            ({ text: pair.en, pairIndex: index }))) }
+    ];
+    wordMatchGrid.replaceChildren();
+    rows.forEach(row => {
+        const rowElement = document.createElement('div');
+        rowElement.className = `wordMatchRow ${row.language}Row`;
+        rowElement.setAttribute('aria-label', row.language === 'zh' ? '中文單詞' : '英文單詞');
+        row.words.forEach(word => {
+            const card = { ...word, language: row.language };
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'wordMatchCard';
+            button.innerText = card.text;
+            button.addEventListener('click', () => selectWordMatchCard(button, card));
+            rowElement.appendChild(button);
+        });
+        wordMatchGrid.appendChild(rowElement);
+    });
+}
+
+function selectWordMatchCard(button, card) {
+    if (!quizState || button.disabled || quizState.locked) return;
+    if (!quizState.selected) {
+        quizState.selected = { button, card };
+        button.classList.add('selected');
+        wordMatchStatus.innerText = `已選擇「${card.text}」，請選另一種語言的配對單詞。`;
+        return;
+    }
+    if (card.language === quizState.selected.card.language) {
+        quizState.selected.button.classList.remove('selected');
+        quizState.selected = { button, card };
+        button.classList.add('selected');
+        wordMatchStatus.innerText = `已選擇「${card.text}」，請選另一種語言的配對單詞。`;
+        return;
+    }
+    let selected = quizState.selected;
+    quizState.selected = null;
+    selected.button.classList.remove('selected');
+    if (selected.card.pairIndex !== card.pairIndex) {
+        wordMatchStatus.innerText = '不太對，再試一次！';
+        return;
+    }
+    selected.button.disabled = true;
+    button.disabled = true;
+    selected.button.classList.add('matched');
+    button.classList.add('matched');
+    quizState.matched.add(card.pairIndex);
+    wordMatchStatus.innerText = `答對了！${quizState.matched.size} / 5`;
+    if (quizState.matched.size === 5) {
+        quizState.locked = true;
+        wordMatchStatus.innerText = '配對完成！';
+        setTimeout(finishShellWordQuiz, 700);
+    }
+}
+
+function finishShellWordQuiz() {
+    quizState = null;
+    gameState.quizActive = false;
+    wordMatchScreen.style.display = 'none';
+    keys = {};
+    touchSprintActive = false;
+    runBtn.classList.remove('active');
+    joystick.active = false;
+    joystick.moveX = 0;
+    joystick.moveY = 0;
+    joystickStick.style.transform = 'translate(0px, 0px)';
+    showNotice('單字配對完成！邪惡貝殼暫時離開了。');
+}
+
+function updateEvilShell() {
+    if (currentFloor !== 3 || !evilShell) return false;
+    const canCapture = Date.now() >= evilShell.cooldownUntil;
+    const seesPlayer = canCapture && !player.inPrison && canEnemySeePlayer(evilShell);
+    if (seesPlayer) {
+        evilShell.alertedTimer = 300;
+        evilShell.lastSeenX = player.x;
+        evilShell.lastSeenY = player.y;
+    } else if (evilShell.alertedTimer > 0) {
+        evilShell.alertedTimer--;
+    }
+    const isChasing = canCapture && evilShell.alertedTimer > 0;
+
+    if (isChasing) {
+        evilShell.targetX = seesPlayer ? player.x : evilShell.lastSeenX;
+        evilShell.targetY = seesPlayer ? player.y : evilShell.lastSeenY;
+    } else if (Math.hypot(evilShell.x - evilShell.targetX, evilShell.y - evilShell.targetY) < 25) {
+        let patrolCell = getRandomOpenCell(getOpenCells(), [evilShell, player]);
+        evilShell.targetX = patrolCell.x;
+        evilShell.targetY = patrolCell.y;
+        evilShell.path = [];
+        evilShell.pathGoalX = -1;
+        evilShell.pathGoalY = -1;
+    }
+    evilShell.pathTimer++;
+    let goalX = Math.floor(evilShell.targetX / TILE_SIZE);
+    let goalY = Math.floor(evilShell.targetY / TILE_SIZE);
+    if (evilShell.pathTimer % 15 === 0 || evilShell.path.length === 0 ||
+        goalX !== evilShell.pathGoalX || goalY !== evilShell.pathGoalY) {
+        evilShell.path = findPath(
+            Math.floor(evilShell.x / TILE_SIZE), Math.floor(evilShell.y / TILE_SIZE),
+            goalX, goalY, evilShell.size);
+        evilShell.pathGoalX = goalX;
+        evilShell.pathGoalY = goalY;
+    }
+    let nextX = evilShell.targetX, nextY = evilShell.targetY;
+    if (evilShell.path.length > 1) {
+        nextX = evilShell.path[1][0] * TILE_SIZE + TILE_SIZE / 2;
+        nextY = evilShell.path[1][1] * TILE_SIZE + TILE_SIZE / 2;
+    }
+    let dx = nextX - evilShell.x, dy = nextY - evilShell.y;
+    let distance = Math.hypot(dx, dy);
+    if (distance > 0.5) {
+        evilShell.angle = Math.atan2(dy, dx);
+        let speed = player.baseSpeed * getModeSetting('monsterSpeed') * (isChasing ? 1.5 : 1);
+        let step = Math.min(speed, distance);
+        moveWithWallSlide(evilShell, dx / distance * step, dy / distance * step, evilShell.size);
+    }
+    if (isChasing && canCapture && !player.inPrison &&
+        Math.hypot(evilShell.x - player.x, evilShell.y - player.y) < evilShell.size + player.size) {
+        beginShellWordQuiz();
+        return true;
+    }
+    return false;
 }
 
 function capturePlayerByRedJade() {
@@ -960,7 +1277,7 @@ function capturePlayerByRedJade() {
 }
 
 function updateRedJade() {
-    if (currentFloor !== 2 || !redJade) return false;
+    if (currentFloor < 2 || !redJade) return false;
     let seesPlayer = !player.inPrison && canEnemySeePlayer(redJade);
     let alertsEnemy = seesPlayer && (player.isRunning || player.itemNoiseTimer > 0);
     if (alertsEnemy) {
@@ -1040,7 +1357,8 @@ function updateRedJade() {
     let distance = Math.hypot(dx, dy);
     if (distance > 0.5) {
         redJade.angle = Math.atan2(dy, dx);
-        let speed = player.speed * (isChasing ? 1.5 : 1);
+        let speed = player.speed / getModeSetting('playerSpeed') *
+            getModeSetting('monsterSpeed') * (isChasing ? 1.5 : 1);
         let step = Math.min(speed, distance);
         moveWithWallSlide(redJade, dx / distance * step, dy / distance * step, redJade.size);
     } else if (!isChasing) {
@@ -1084,6 +1402,10 @@ function triggerMysteryBox() {
 
 function handleMovement() {
     player.isMoving = false;
+    if (gameState.quizActive) {
+        player.isRunning = false;
+        return;
+    }
     let dx = 0, dy = 0;
     if (keys['w'] || keys['arrowup']) dy = -1;
     if (keys['s'] || keys['arrowdown']) dy = 1;
@@ -1095,9 +1417,11 @@ function handleMovement() {
     let speedMult = 1.0;
     if (player.drinkTimer > 0) speedMult += 0.5;
     if (player.mysterySpeedTimer > 0) speedMult += 0.5;
-    let sprintInput = (keys['shift'] || touchSprintActive) && !player.sprintExhausted;
+    let sprintInput = selectedGameMode !== 'hell' &&
+        (keys['shift'] || touchSprintActive) && !player.sprintExhausted;
     let wantsToSprint = sprintInput && player.stamina > 0 && (dx !== 0 || dy !== 0);
-    player.speed = player.baseSpeed * speedMult * (wantsToSprint ? 1.4 : 1);
+    player.speed = player.baseSpeed * getModeSetting('playerSpeed') *
+        speedMult * (wantsToSprint ? 1.4 : 1);
 
     if (dx !== 0 || dy !== 0) {
         let previousX = player.x, previousY = player.y;
@@ -1133,16 +1457,17 @@ function handleMovement() {
     } else if (player.sprintRecoveryDelay > 0) {
         player.sprintRecoveryDelay--;
         if (player.sprintRecoveryDelay === 0) {
-            player.stamina = Math.min(450, player.stamina + 0.75);
+            player.stamina = Math.min(getStaminaMaximum(), player.stamina + 0.75);
         }
     } else {
-        player.stamina = Math.min(450, player.stamina + 0.75);
+        player.stamina = Math.min(getStaminaMaximum(), player.stamina + 0.75);
     }
     if (!player.isRunning) {
         if (!(keys['shift'] || touchSprintActive)) player.sprintExhausted = false;
     }
-    staminaBar.style.width = `${player.stamina / 450 * 100}%`;
-    staminaBar.style.background = player.stamina < 90 ? '#ff5252' : '#76ff03';
+    let staminaMaximum = getStaminaMaximum();
+    staminaBar.style.width = `${player.stamina / staminaMaximum * 100}%`;
+    staminaBar.style.background = player.stamina < staminaMaximum * 0.2 ? '#ff5252' : '#76ff03';
     if (player.inPrisonRoom &&
         (Math.floor(player.x / TILE_SIZE) < prisonRoom.left ||
             Math.floor(player.x / TILE_SIZE) > prisonRoom.right ||
@@ -1153,28 +1478,52 @@ function handleMovement() {
 }
 
 function triggerSound(x, y, maxRadius = 450, gridRange = 0, soundType = 'item') {
+    let soundMultiplier = getModeSetting('soundRange');
+    let shellSoundSide = 0;
+    if (soundType === 'shell') {
+        shellSoundSide = 20 * currentFloor * soundMultiplier;
+        maxRadius = Math.hypot(shellSoundSide * TILE_SIZE / 2, shellSoundSide * TILE_SIZE / 2);
+        gridRange = shellSoundSide;
+    } else {
+        maxRadius *= soundMultiplier;
+        if (gridRange > 0) gridRange = (gridRange + 0.5) * soundMultiplier;
+    }
     soundWaves.push({
-        x: x, y: y, radius: 10, maxRadius: maxRadius, alpha: 1, isFlash: false,
+        x: x, y: y, radius: Math.min(10, maxRadius), maxRadius: maxRadius, alpha: 1, isFlash: false,
         isFootstep: soundType === 'footstep', soundType: soundType,
         gridRange: gridRange
     });
     let canHear;
     if (soundType === 'door') {
-        let side = currentFloor * 30;
+        let side = Math.max(1, Math.round(currentFloor * 30 * soundMultiplier));
         let left = Math.floor(x / TILE_SIZE) - Math.floor(side / 2);
         let top = Math.floor(y / TILE_SIZE) - Math.floor(side / 2);
         let enemyGridX = Math.floor(giraffe.x / TILE_SIZE);
         let enemyGridY = Math.floor(giraffe.y / TILE_SIZE);
         canHear = enemyGridX >= left && enemyGridX < left + side &&
             enemyGridY >= top && enemyGridY < top + side;
+    } else if (soundType === 'shell') {
+        let left = Math.floor(x / TILE_SIZE) - Math.floor(shellSoundSide / 2);
+        let top = Math.floor(y / TILE_SIZE) - Math.floor(shellSoundSide / 2);
+        let enemyGridX = Math.floor(giraffe.x / TILE_SIZE);
+        let enemyGridY = Math.floor(giraffe.y / TILE_SIZE);
+        canHear = enemyGridX >= left && enemyGridX < left + shellSoundSide &&
+            enemyGridY >= top && enemyGridY < top + shellSoundSide;
     } else if (gridRange > 0) {
-        canHear = Math.abs(Math.floor(giraffe.x / TILE_SIZE) - Math.floor(x / TILE_SIZE)) <= gridRange &&
-            Math.abs(Math.floor(giraffe.y / TILE_SIZE) - Math.floor(y / TILE_SIZE)) <= gridRange;
+        canHear = Math.abs(giraffe.x - x) <= gridRange * TILE_SIZE &&
+            Math.abs(giraffe.y - y) <= gridRange * TILE_SIZE;
     } else {
         canHear = Math.hypot(giraffe.x - x, giraffe.y - y) <= maxRadius;
     }
     if (giraffe.ccTimer <= 0 && giraffe.state !== 'CHASE' && canHear) {
         giraffe.state = 'INVESTIGATE'; giraffe.targetX = x; giraffe.targetY = y; giraffe.path = []; giraffe.searchedRoom = false;
+    }
+    if (soundType === 'shell' && redJade &&
+        Math.abs(redJade.x - x) <= shellSoundSide * TILE_SIZE / 2 &&
+        Math.abs(redJade.y - y) <= shellSoundSide * TILE_SIZE / 2) {
+        redJade.alertedTimer = Math.max(redJade.alertedTimer, 300);
+        redJade.lastSeenX = x;
+        redJade.lastSeenY = y;
     }
 }
 
@@ -1187,6 +1536,7 @@ function updateGiraffeAI() {
         if (giraffe.ccType === 'STROBE') label = "💡 被爆閃燈閃瞎，頭暈目眩！ (5秒)";
         if (giraffe.ccType === 'DOLL') label = "🧸 正深情看著長頸鹿玩偶... (8秒)";
         if (giraffe.ccType === 'MYSTERY_SLEEP') label = "💤 陷入神祕催眠深度沉睡... (15秒)";
+        if (giraffe.ccType === 'EASY_FIRST_HIT') label = "😵 簡單模式保護：長頸鹿暈眩中 (3秒)";
         statusUI.innerText = "🦒 長頸鹿狀態: " + label;
         return;
     }
@@ -1351,6 +1701,7 @@ function updateGiraffeAI() {
     let distance = Math.hypot(deltaX, deltaY);
     let moved = false;
     if (distance > 0) {
+        currentSpeed *= getModeSetting('monsterSpeed');
         let stepX = (deltaX / distance) * Math.min(currentSpeed, distance);
         let stepY = (deltaY / distance) * Math.min(currentSpeed, distance);
         giraffe.angle = Math.atan2(deltaY, deltaX);
@@ -1379,7 +1730,7 @@ function updateGiraffeAI() {
 }
 
 function pickNextPatrolWaypoint() {
-    if (currentFloor === 2) {
+    if (currentFloor >= 2) {
         let cell = getRandomOpenCell(getOpenCells(), [giraffe]);
         giraffe.waypointIndex++;
         giraffe.targetX = cell.x;
@@ -1407,8 +1758,10 @@ function update() {
         }
     }
 
+    if (player.easyModeGraceTimer > 0) player.easyModeGraceTimer--;
     if (!player.inPrison) handleMovement();
     updateRedJade();
+    if (updateEvilShell()) return;
     updateGiraffeAI();
     if (player.inPrison) {
         statusUI.innerText = `🔴 小黑屋：${Math.ceil(player.prisonTimer / 60)} 秒後解鎖`;
@@ -1470,7 +1823,7 @@ function update() {
     // 音波擴散
     for (let i = soundWaves.length - 1; i >= 0; i--) {
         let wave = soundWaves[i];
-        if (wave.soundType === 'door' || wave.soundType === 'prison') {
+        if (wave.soundType === 'door' || wave.soundType === 'prison' || wave.soundType === 'shell') {
             wave.radius += wave.maxRadius / 90;
             wave.alpha -= 1 / 90;
         } else {
@@ -1508,17 +1861,31 @@ function update() {
     deliveredTotalUI.innerText = tablets.length;
 
     if (centerZone.delivered === tablets.length) {
-        if (currentFloor === 1) {
+        if (currentFloor < 3) {
             gameState.transition = true;
-            showNotice('💥 地板爆裂！正在墜入第二層…');
-            unlockSecondFloorAndContinue();
+            showNotice(`💥 地板爆裂！正在墜入第 ${currentFloor + 1} 層…`);
+            unlockNextFloorAndContinue(currentFloor + 1);
         } else {
             gameState.won = true;
-            endGame("🎉 成功回收第二層的所有實驗數據平板！");
+            endGame("🎉 成功回收第三層的所有實驗數據平板！");
         }
         return;
     }
-    if (!player.inPrison && Math.hypot(player.x - giraffe.x, player.y - giraffe.y) < player.size + giraffe.size) { gameState.over = true; endGame("🦒 被長頸鹿正面撲倒了！實驗失敗。"); }
+    if (!player.inPrison &&
+        Math.hypot(player.x - giraffe.x, player.y - giraffe.y) < player.size + giraffe.size) {
+        if (selectedGameMode === 'easy' && !easyModeFirstHitUsed) {
+            easyModeFirstHitUsed = true;
+            player.easyModeGraceTimer = 180;
+            giraffe.ccTimer = 180;
+            giraffe.ccType = 'EASY_FIRST_HIT';
+            giraffe.state = 'PATROL';
+            giraffe.path = [];
+            showNotice('簡單模式保護！首次被抓不會死亡，長頸鹿暈眩 3 秒。');
+        } else if (player.easyModeGraceTimer <= 0) {
+            gameState.over = true;
+            endGame("🦒 被長頸鹿正面撲倒了！實驗失敗。");
+        }
+    }
 }
 
 function draw() {
@@ -1590,6 +1957,16 @@ function draw() {
             ctx.lineWidth = 2;
             ctx.setLineDash([8, 8]);
             ctx.beginPath(); ctx.arc(wave.x, wave.y, wave.maxRadius, 0, Math.PI * 2); ctx.stroke();
+        } else if (wave.soundType === 'shell') {
+            let side = wave.gridRange * TILE_SIZE;
+            ctx.strokeStyle = 'rgba(255, 82, 82, 0.2)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 8]);
+            ctx.strokeRect(wave.x - side / 2, wave.y - side / 2, side, side);
+            ctx.strokeStyle = `rgba(255, 82, 82, ${wave.alpha})`;
+            ctx.setLineDash([]);
+            ctx.strokeRect(wave.x - wave.radius, wave.y - wave.radius,
+                wave.radius * 2, wave.radius * 2);
         }
         ctx.strokeStyle = wave.isFlash ? `rgba(255,255,255,${wave.alpha})` : `rgba(255, 110, 64, ${wave.alpha})`;
         ctx.lineWidth = wave.isFlash ? 5 : 2; if(!wave.isFlash) ctx.setLineDash([6, 6]);
@@ -1598,14 +1975,19 @@ function draw() {
     });
 
     if (showFootstepRange.checked) {
-        let rangeX = Math.floor(player.x / TILE_SIZE) * TILE_SIZE - 2 * TILE_SIZE;
-        let rangeY = Math.floor(player.y / TILE_SIZE) * TILE_SIZE - 2 * TILE_SIZE;
+        let soundRangeMultiplier = getModeSetting('soundRange');
+        let halfRange = 2.5 * soundRangeMultiplier * TILE_SIZE;
+        let centerX = Math.floor(player.x / TILE_SIZE) * TILE_SIZE + TILE_SIZE / 2;
+        let centerY = Math.floor(player.y / TILE_SIZE) * TILE_SIZE + TILE_SIZE / 2;
+        let rangeX = centerX - halfRange;
+        let rangeY = centerY - halfRange;
+        let rangeSize = halfRange * 2;
         ctx.fillStyle = 'rgba(255, 110, 64, 0.06)';
-        ctx.fillRect(rangeX, rangeY, 5 * TILE_SIZE, 5 * TILE_SIZE);
+        ctx.fillRect(rangeX, rangeY, rangeSize, rangeSize);
         ctx.strokeStyle = 'rgba(255, 110, 64, 0.65)';
         ctx.lineWidth = 2;
         ctx.setLineDash([8, 6]);
-        ctx.strokeRect(rangeX, rangeY, 5 * TILE_SIZE, 5 * TILE_SIZE);
+        ctx.strokeRect(rangeX, rangeY, rangeSize, rangeSize);
         ctx.setLineDash([]);
     }
 
@@ -1671,6 +2053,27 @@ function draw() {
         ctx.restore();
     }
 
+    if (evilShell) {
+        ctx.save();
+        ctx.translate(evilShell.x, evilShell.y);
+        ctx.rotate(evilShell.angle);
+        if (showMonsterVision.checked) {
+            ctx.fillStyle = 'rgba(171, 71, 188, 0.09)';
+            ctx.beginPath(); ctx.moveTo(0, 0);
+            ctx.arc(0, 0, 375, -Math.PI / 3, Math.PI / 3);
+            ctx.closePath(); ctx.fill();
+        }
+        ctx.font = '32px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 16;
+        ctx.shadowColor = '#ab47bc';
+        ctx.fillText('🐚', 0, 0);
+        ctx.fillStyle = '#d50000';
+        ctx.beginPath(); ctx.arc(7, -4, 2.5, 0, Math.PI * 2); ctx.arc(7, 4, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+    }
+
     if (player.inPrison) {
         ctx.save();
         ctx.fillStyle = 'rgba(0, 0, 0, 0.94)';
@@ -1723,7 +2126,7 @@ function draw() {
 }
 
 function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
-function startGame(floor = 1) {
+function startGame(floor = 1, preserveRun = false) {
     if (!currentAccount) {
         setAccountStatus('請先登入雲端存檔。', true);
         return;
@@ -1732,6 +2135,7 @@ function startGame(floor = 1) {
         setAccountStatus('此樓層尚未解鎖。', true);
         return;
     }
+    if (!preserveRun) easyModeFirstHitUsed = false;
     mainMenu.style.display = 'none';
     messageScreen.style.display = 'none';
     hideMessageAction();
@@ -1756,6 +2160,16 @@ accountNameInput.addEventListener('keydown', event => {
 });
 floor1Button.addEventListener('click', () => startGame(1));
 floor2Button.addEventListener('click', () => startGame(2));
+floor3Button.addEventListener('click', () => startGame(3));
+gameModeInputs.forEach(input => {
+    input.addEventListener('change', () => {
+        if (input.checked) {
+            selectGameMode(input.value);
+        } else if (selectedGameMode === input.value) {
+            selectGameMode('');
+        }
+    });
+});
 
 window.addEventListener('keydown', e => {
     if (typeof e.key !== 'string') return;
