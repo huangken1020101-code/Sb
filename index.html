@@ -2,17 +2,18 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=none">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>長頸鹿惡夢 II：戰術道具迷宮</title>
     <style>
         * { box-sizing: border-box; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
         body {
             margin: 0; padding: 0; background-color: #050505; color: #fff;
             font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center;
-            height: 100vh; overflow: hidden;
+            width: 100%; height: 100vh; height: 100dvh; overflow: hidden;
         }
         #gameWrapper {
-            position: relative; width: 100%; height: 100%; max-width: 800px; max-height: 600px;
+            position: relative; width: min(100vw, 133.333vh); height: min(100vh, 75vw);
+            max-width: 800px; max-height: 600px; flex: none;
             aspect-ratio: 4/3; background: #000; box-shadow: 0 0 35px rgba(0,0,0,1);
         }
         /* 主首頁 */
@@ -62,13 +63,37 @@
         
         /* UI 顯示 */
         canvas { width: 100%; height: 100%; display: block; }
-        #ui {
-            position: absolute; top: 15px; left: 15px; font-size: 13px; font-weight: bold;
-            background: rgba(10,10,10,0.9); padding: 12px 16px; border-radius: 8px; 
-            border: 1px solid #444; pointer-events: none; z-index: 2; line-height: 1.6;
+        #hud {
+            position: absolute; inset: 0; z-index: 2; padding: 10px 15px;
+            display: flex; flex-direction: column; align-items: flex-start; gap: 5px;
+            pointer-events: none;
         }
-        #staminaTrack { width: 150px; height: 10px; margin-top: 3px; background: #333; border-radius: 5px; overflow: hidden; }
-        #staminaBar { width: 100%; height: 100%; background: #76ff03; transition: width 0.08s linear; }
+        #ui {
+            position: relative; font-size: 13px; font-weight: bold;
+            background: rgba(10,10,10,0.9); padding: 12px 16px; border-radius: 8px; 
+            border: 1px solid #444; line-height: 1.6;
+        }
+        #vitalsUI { display: flex; align-items: flex-start; gap: 8px; }
+        .vital-meter {
+            display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+            padding: 5px 8px; border: 1px solid #39434a; border-radius: 6px;
+            background: rgba(10,10,10,0.86); font-size: 11px; font-weight: bold;
+        }
+        .vital-label { white-space: nowrap; }
+        #staminaTrack, #rainTrack {
+            position: relative; width: min(150px, 30vw); height: 10px;
+            margin-top: 2px; background: #333; border-radius: 5px; overflow: hidden;
+        }
+        #rainTrack { background: #263238; }
+        #staminaBar, #rainBar {
+            position: absolute; left: 0; bottom: 0; width: var(--progress, 100%); height: 100%;
+            border-radius: inherit; transition: width 0.12s linear, height 0.12s linear;
+        }
+        #staminaBar { background: #76ff03; }
+        #rainBar { background: #29b6f6; }
+        #hud:not(.game-active) #vitalsUI { display: none; }
+        #hud #staminaUI { display: none; }
+        #hud.game-active #staminaUI { display: flex; }
         #warningUI {
             position: absolute; top: 15px; right: 15px; font-size: 15px; font-weight: bold;
             background: rgba(244,67,54,0.9); padding: 8px 12px; border-radius: 6px;
@@ -105,27 +130,86 @@
 
         /* 手機虛擬搖桿與道具鈕 */
         #joystickContainer {
-            position: absolute; bottom: 20px; left: 20px; width: 110px; height: 110px;
+            --joystick-size: clamp(72px, 18vw, 110px);
+            position: absolute; bottom: 20px; left: 20px;
+            width: var(--joystick-size); height: var(--joystick-size);
             background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.2);
             border-radius: 50%; display: none; touch-action: none; z-index: 3;
         }
         #joystickStick {
-            position: absolute; top: 38px; left: 38px; width: 34px; height: 34px;
+            position: absolute;
+            top: calc((var(--joystick-size) - 34px) / 2);
+            left: calc((var(--joystick-size) - 34px) / 2);
+            width: 34px; height: 34px;
             background: rgba(255,255,255,0.6); border-radius: 50%;
         }
         #useItemBtn {
-            position: absolute; bottom: 30px; right: 30px; width: 75px; height: 75px;
+            --touch-button-size: clamp(56px, 12vw, 75px);
+            position: absolute; bottom: 30px; right: min(30px, 5vw);
+            width: var(--touch-button-size); height: var(--touch-button-size);
             background: #ff9800; color: white; border: none; border-radius: 50%;
-            font-weight: bold; font-size: 14px; display: none; z-index: 3;
+            font-weight: bold; font-size: clamp(10px, 3vw, 14px); display: none; z-index: 3;
             box-shadow: 0 4px 15px rgba(0,0,0,0.6); text-align: center; line-height: 1.2;
         }
         #runBtn {
-            position: absolute; bottom: 30px; right: 120px; width: 75px; height: 75px;
+            --touch-button-size: clamp(56px, 12vw, 75px);
+            position: absolute; bottom: 30px;
+            right: calc(var(--touch-button-size) + min(45px, 12vw));
+            width: var(--touch-button-size); height: var(--touch-button-size);
             background: #558b2f; color: white; border: 2px solid rgba(255,255,255,0.55);
-            border-radius: 50%; font-weight: bold; font-size: 14px; display: none;
+            border-radius: 50%; font-weight: bold; font-size: clamp(10px, 3vw, 14px); display: none;
             z-index: 3; touch-action: none; box-shadow: 0 4px 15px rgba(0,0,0,0.6);
         }
         #runBtn.active { background: #9ccc65; }
+        @media (min-width: 700px) and (hover: hover) and (pointer: fine) {
+            #hud { display: block; padding: 0; }
+            #ui { position: absolute; top: 15px; left: 15px; }
+            #vitalsUI {
+                position: absolute; top: 50%; right: 15px; transform: translateY(-50%);
+                flex-direction: column; align-items: center; gap: 14px;
+                padding: 14px 10px; border: 1px solid #39434a; border-radius: 10px;
+                background: rgba(10,10,10,0.9);
+            }
+            .vital-meter { align-items: center; gap: 7px; padding: 0; border: 0; background: none; }
+            .vital-label { max-width: 74px; text-align: center; white-space: normal; }
+            #staminaTrack, #rainTrack { width: 34px; height: min(235px, 36vh); margin-top: 0; }
+            #staminaBar, #rainBar { top: auto; bottom: 0; left: 0; width: 100%; height: var(--progress, 100%); }
+        }
+        @media (min-width: 1000px) and (hover: hover) and (pointer: fine) {
+            #vitalsUI { position: fixed; right: auto; left: max(15px, calc(50vw - 580px)); }
+        }
+        @media (min-width: 1100px) and (hover: hover) and (pointer: fine) {
+            #hud.game-active #vitalsUI {
+                top: 50%; left: max(8px, calc(50vw - 740px)); right: auto;
+                width: min(128px, calc(50vw - 416px)); height: min(90vh, 700px);
+                transform: translateY(-50%); flex-direction: row; align-items: stretch;
+                justify-content: space-between;
+                gap: 0; margin: 0; padding: 18px 0 0; border: 0; z-index: 2;
+                background: transparent;
+            }
+            #hud.game-active .vital-meter {
+                position: relative; height: 100%; flex: 0 0 28px; align-items: center; gap: 0;
+                padding: 0; border: 0; background: transparent;
+            }
+            #hud.game-active .vital-label {
+                position: absolute; top: -18px; left: 50%; width: max-content;
+                transform: translateX(-50%); font-size: 10px; white-space: nowrap;
+            }
+            #hud.game-active #staminaTrack, #hud.game-active #rainTrack {
+                width: 100%; height: 100%; margin: 0;
+            }
+            #hud.game-active #staminaBar, #hud.game-active #rainBar {
+                top: auto; bottom: 0; left: 0; width: 100%; height: var(--progress, 100%);
+            }
+        }
+        @media (max-width: 699px) {
+            #ui { padding: 8px 10px; font-size: 11px; line-height: 1.35; }
+            #itemUI { margin-top: 3px !important; padding-top: 3px !important; }
+            #statusUI { font-size: 9px !important; }
+            #vitalsUI { gap: 5px; }
+            .vital-meter { gap: 2px; padding: 4px 6px; font-size: 10px; }
+            #staminaTrack, #rainTrack { width: min(120px, 29vw); height: 8px; }
+        }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     </style>
 </head>
@@ -155,11 +239,12 @@
                     <button id="floor1Button" class="btn" type="button">第一層</button>
                     <button id="floor2Button" class="btn" type="button" disabled>第二層（尚未解鎖）</button>
                     <button id="floor3Button" class="btn" type="button" disabled>第三層（尚未解鎖）</button>
+                    <button id="floor4Button" class="btn" type="button" disabled>第四層（尚未解鎖）</button>
                 </div>
             </section>
             <section id="displaySettings" aria-label="顯示設定">
                 <h2>顯示設定</h2>
-                <label><input id="showMonsterVision" type="checkbox" checked>顯示怪物視野（長頸鹿／紅玉）</label>
+                <label><input id="showMonsterVision" type="checkbox" checked>顯示怪物視野</label>
                 <label><input id="showFootstepRange" type="checkbox" checked>顯示走路聲音範圍（5×5 格）</label>
                 <label><input id="showDoorSoundRange" type="checkbox" checked>顯示開門聲音範圍</label>
                 <label><input id="showItemSoundRange" type="checkbox" checked>顯示道具聲音範圍</label>
@@ -168,6 +253,7 @@
             <section id="gameModeSettings" aria-label="遊戲模式">
                 <h2>遊戲模式（可不選，最多選一種）</h2>
                 <label><input class="gameMode" type="checkbox" value="easy">簡單：首次被長頸鹿抓到不死亡並暈眩 3 秒；怪物速度 0.8 倍、玩家速度 1.3 倍、聲音範圍減半</label>
+                <label><input class="gameMode" type="checkbox" value="superEasy">超簡單：前三次被長頸鹿抓到不死亡；玩家速度 2 倍、怪物速度 0.5 倍、聲音範圍 0.4 倍</label>
                 <label><input class="gameMode" type="checkbox" value="hard">困難：體力上限減半；怪物速度 1.3 倍、玩家速度 0.9 倍、聲音範圍 1.2 倍</label>
                 <label><input class="gameMode" type="checkbox" value="hell">地域模式：無法奔跑；怪物速度 1.5 倍、玩家速度 0.85 倍、聲音範圍 1.25 倍</label>
             </section>
@@ -175,14 +261,25 @@
 
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         
-        <div id="ui">
-            <div id="floorUI" style="color: #ffb74d;">📍 樓層: 第一層</div>
-            <div id="carryUI" style="color: #ffeb3b;">🎒 背包容量: 0 / 2</div>
-            <div style="color: #a7ffeb;">📱 剩餘平板: <span id="remainingCount">8</span></div>
-            <div style="color: #00e5ff;">🔵 已繳回中心: <span id="deliveredCount">0</span> / <span id="deliveredTotal">8</span></div>
-            <div id="itemUI" style="color: #ff9800; border-top: 1px solid #333; margin-top: 5px; padding-top: 5px;">📦 攜帶道具: 無</div>
-            <div id="statusUI" style="color: #ff5722; font-size: 11px; margin-top: 4px;">🦒 長頸鹿狀態: 巡邏中</div>
-            <div id="staminaUI" style="color:#b2ff59; font-size:11px;">🏃 體力 <div id="staminaTrack"><div id="staminaBar"></div></div></div>
+        <div id="hud">
+            <div id="ui">
+                <div id="floorUI" style="color: #ffb74d;">📍 樓層: 第一層</div>
+                <div id="carryUI" style="color: #ffeb3b;">🎒 背包容量: 0 / 2</div>
+                <div style="color: #a7ffeb;">📱 剩餘平板: <span id="remainingCount">8</span></div>
+                <div style="color: #00e5ff;">🔵 已繳回中心: <span id="deliveredCount">0</span> / <span id="deliveredTotal">8</span></div>
+                <div id="itemUI" style="color: #ff9800; border-top: 1px solid #333; margin-top: 5px; padding-top: 5px;">📦 攜帶道具: 無</div>
+                <div id="statusUI" style="color: #ff5722; font-size: 11px; margin-top: 4px;">🦒 長頸鹿狀態: 巡邏中</div>
+            </div>
+            <div id="vitalsUI" aria-label="狀態進度">
+                <div id="staminaUI" class="vital-meter" style="color:#b2ff59;">
+                    <div class="vital-label">🏃 體力</div>
+                    <div id="staminaTrack"><div id="staminaBar"></div></div>
+                </div>
+                <div id="rainUI" class="vital-meter" style="display:none; color:#80deea;">
+                    <div class="vital-label">🌧 雨量 <span id="rainProgressText">50%</span></div>
+                    <div id="rainTrack"><div id="rainBar"></div></div>
+                </div>
+            </div>
         </div>
 
         <div id="warningUI">🎒 背包已滿！請先回中心放平板！</div>
@@ -233,6 +330,7 @@ const floorSelect = document.getElementById('floorSelect');
 const floor1Button = document.getElementById('floor1Button');
 const floor2Button = document.getElementById('floor2Button');
 const floor3Button = document.getElementById('floor3Button');
+const floor4Button = document.getElementById('floor4Button');
 const messageActionButton = document.getElementById('messageActionButton');
 const wordMatchScreen = document.getElementById('wordMatchScreen');
 const wordMatchTitle = document.getElementById('wordMatchTitle');
@@ -248,6 +346,9 @@ const deliveredCountUI = document.getElementById('deliveredCount');
 const deliveredTotalUI = document.getElementById('deliveredTotal');
 const itemUI = document.getElementById('itemUI');
 const statusUI = document.getElementById('statusUI');
+const rainUI = document.getElementById('rainUI');
+const rainProgressText = document.getElementById('rainProgressText');
+const rainBar = document.getElementById('rainBar');
 
 const TILE_SIZE = 50;
 
@@ -294,6 +395,7 @@ let player, giraffe, centerZone, tablets, gameState, soundWaves = [];
 let itemBoxes = [], deployedItems = [];
 let redJade = null, evilShell = null, prisonRoom = null;
 let secondFloorRooms = [];
+let rainSystem = null;
 let currentFloor = 1, unlockedFloor = 1, currentAccount = "";
 let levelMapRows = mapTemplate.length, redJadeCaptureCount = 0;
 let quizState = null;
@@ -305,9 +407,13 @@ let doorTimers = {};
 let gameNotice = { text: "", timer: 0 };
 let selectedGameMode = "";
 let easyModeFirstHitUsed = false;
+let superEasyCatchCount = 0;
+let giraffeClone = null;
+let giraffeCloneTimer = 0;
 
 const gameModeSettings = {
     easy: { playerSpeed: 1.3, monsterSpeed: 0.8, soundRange: 0.5, staminaMax: 450 },
+    superEasy: { playerSpeed: 2, monsterSpeed: 0.5, soundRange: 0.4, staminaMax: 450 },
     hard: { playerSpeed: 0.9, monsterSpeed: 1.3, soundRange: 1.2, staminaMax: 225 },
     hell: { playerSpeed: 0.85, monsterSpeed: 1.5, soundRange: 1.25, staminaMax: 450 }
 };
@@ -396,8 +502,59 @@ function generateThirdFloorTemplate() {
     return cells.map(row => row.join(""));
 }
 
+function generateFourthFloorTemplate() {
+    const columns = 66, rows = 62;
+    const cells = Array.from({ length: rows }, () => Array(columns).fill(1));
+    const roomColumns = [7, 28, 49];
+    const roomRows = [3, 15, 27, 39, 51];
+    secondFloorRooms = roomRows.flatMap((top, rowIndex) =>
+        roomColumns.flatMap((left, columnIndex) =>
+            rowIndex === 4 && columnIndex === 0 ? [] : [{
+                left, right: left + 9, top, bottom: top + 8
+            }]
+        )
+    );
+
+    secondFloorRooms.forEach(room => {
+        for (let y = room.top + 1; y < room.bottom; y++) {
+            for (let x = room.left + 1; x < room.right; x++) cells[y][x] = 0;
+        }
+    });
+
+    const corridorRows = [12, 24, 36, 48];
+    corridorRows.forEach(y => {
+        for (let x = 2; x < columns - 2; x++) cells[y][x] = 0;
+    });
+    for (let x = 2; x < columns - 2; x++) cells[60][x] = 0;
+    [[2, 12, 48], [20, 12, 60], [40, 12, 60], [63, 12, 60]]
+        .forEach(([x, top, bottom]) => {
+            for (let y = top; y <= bottom; y++) cells[y][x] = 0;
+        });
+
+    secondFloorRooms.forEach(room => {
+        const rowIndex = roomRows.indexOf(room.top);
+        const columnIndex = roomColumns.indexOf(room.left);
+        const doorX = room.left + 4 + ((rowIndex + columnIndex) % 2);
+        const secondDoorX = room.left + (doorX - room.left === 4 ? 6 : 4);
+        if (rowIndex === 0) {
+            cells[room.bottom][doorX] = 2;
+            cells[room.bottom][secondDoorX] = 2;
+            cells[room.bottom + 1][doorX] = 0;
+            cells[room.bottom + 1][secondDoorX] = 0;
+        } else {
+            cells[room.top][doorX] = 2;
+            cells[room.bottom][secondDoorX] = 2;
+            for (let y = room.top - 3; y < room.top; y++) cells[y][doorX] = 0;
+            cells[room.bottom + 1][secondDoorX] = 0;
+        }
+    });
+
+    return cells.map(row => row.join(""));
+}
+
 function generateSecondFloorTemplate() {
     if (currentFloor === 3) return generateThirdFloorTemplate();
+    if (currentFloor === 4) return generateFourthFloorTemplate();
 
     const columns = 41, rows = 31;
     let cells = Array.from({ length: rows }, () => Array(columns).fill(1));
@@ -459,8 +616,10 @@ function generateSecondFloorTemplate() {
 }
 
 function addPrisonRoom() {
-    const bounds = currentFloor === 3
-        ? { left: 2, right: 7, top: 20, bottom: 26, exitY: 23 }
+    const bounds = currentFloor === 4
+        ? { left: 2, right: 7, top: 51, bottom: 57, exitY: 54 }
+        : currentFloor === 3
+            ? { left: 2, right: 7, top: 20, bottom: 26, exitY: 23 }
         : currentFloor === 2
             ? { left: 2, right: 8, top: 12, bottom: 18, exitY: 15 }
             : { left: 2, right: 8, top: 14, bottom: 19, exitY: 16 };
@@ -471,9 +630,12 @@ function addPrisonRoom() {
     }
     mapGrid[bounds.exitY][bounds.right] = 2;
     mapGrid[bounds.exitY][bounds.right + 1] = 0;
-    if (currentFloor === 3) {
-        for (let y = bounds.exitY - 2; y <= bounds.exitY + 1; y++) {
-            mapGrid[y][bounds.right + 1] = 0;
+    if (currentFloor >= 3) {
+        const corridorX = bounds.right + 1;
+        const firstCorridorY = currentFloor === 4 ? 48 : bounds.exitY - 2;
+        const lastCorridorY = currentFloor === 4 ? bounds.exitY : bounds.exitY + 1;
+        for (let y = firstCorridorY; y <= lastCorridorY; y++) {
+            mapGrid[y][corridorX] = 0;
         }
     } else if (currentFloor === 2) {
         for (let y = 13; y <= 19; y++) mapGrid[y][9] = 0;
@@ -510,6 +672,33 @@ function getOpenCells() {
         }
     }
     return cells;
+}
+
+function isOpenThreeByThreeCell(cell) {
+    for (let y = cell.gridY - 1; y <= cell.gridY + 1; y++) {
+        for (let x = cell.gridX - 1; x <= cell.gridX + 1; x++) {
+            if (!mapGrid[y] || mapGrid[y][x] !== 0 ||
+                (prisonRoom && x > prisonRoom.left && x < prisonRoom.right &&
+                    y > prisonRoom.top && y < prisonRoom.bottom)) return false;
+        }
+    }
+    return true;
+}
+
+function isInsideThreeByThreeFootprint(entity, x, y) {
+    return Math.abs(Math.floor(entity.x / TILE_SIZE) - Math.floor(x / TILE_SIZE)) <= 1 &&
+        Math.abs(Math.floor(entity.y / TILE_SIZE) - Math.floor(y / TILE_SIZE)) <= 1;
+}
+
+function footprintsOverlapThreeByThree(first, second) {
+    return Math.abs(Math.floor(first.x / TILE_SIZE) - Math.floor(second.x / TILE_SIZE)) <= 2 &&
+        Math.abs(Math.floor(first.y / TILE_SIZE) - Math.floor(second.y / TILE_SIZE)) <= 2;
+}
+
+function overlapsVisibleItem(cell) {
+    return tablets.some(tablet => isInsideThreeByThreeFootprint(tablet, cell.x, cell.y)) ||
+        itemBoxes.some(box => box.active && isInsideThreeByThreeFootprint(box, cell.x, cell.y)) ||
+        deployedItems.some(item => !item.expired && isInsideThreeByThreeFootprint(item, cell.x, cell.y));
 }
 
 function getSecondFloorRoomCells() {
@@ -588,6 +777,8 @@ function setLoggedInAccount(account, highestFloor) {
     floor2Button.innerText = unlockedFloor >= 2 ? '第二層' : '第二層（尚未解鎖）';
     floor3Button.disabled = unlockedFloor < 3;
     floor3Button.innerText = unlockedFloor >= 3 ? '第三層' : '第三層（尚未解鎖）';
+    floor4Button.disabled = unlockedFloor < 4;
+    floor4Button.innerText = unlockedFloor >= 4 ? '第四層' : '第四層（尚未解鎖）';
     setAccountStatus(`已連線；目前可選擇至第 ${unlockedFloor} 層。`);
 }
 
@@ -607,7 +798,7 @@ async function loginAccount() {
     try {
         let document = await getCloudAccount(account);
         let storedFloor = document ? Number(document.fields?.unlockedFloor?.integerValue || 1) : 1;
-        let highestFloor = Math.max(1, Math.min(3, Number.isInteger(storedFloor) ? storedFloor : 1));
+        let highestFloor = Math.max(1, Math.min(4, Number.isInteger(storedFloor) ? storedFloor : 1));
         if (!document) await saveCloudProgress(account, highestFloor);
         setLoggedInAccount(account, highestFloor);
     } catch (error) {
@@ -625,6 +816,8 @@ function logoutAccount() {
     accountLoginButton.style.display = 'block';
     accountLogoutButton.style.display = 'none';
     floorSelect.hidden = true;
+    floor4Button.disabled = true;
+    floor4Button.innerText = '第四層（尚未解鎖）';
     setAccountStatus('');
 }
 
@@ -649,6 +842,8 @@ async function unlockNextFloorAndContinue(nextFloor = currentFloor + 1) {
         floor2Button.innerText = unlockedFloor >= 2 ? '第二層' : '第二層（尚未解鎖）';
         floor3Button.disabled = unlockedFloor < 3;
         floor3Button.innerText = unlockedFloor >= 3 ? '第三層' : '第三層（尚未解鎖）';
+        floor4Button.disabled = unlockedFloor < 4;
+        floor4Button.innerText = unlockedFloor >= 4 ? '第四層' : '第四層（尚未解鎖）';
         showNotice(`地板爆裂！正在墜入第 ${nextFloor} 層迷宮…`);
         setTimeout(() => startGame(nextFloor, true), 1200);
     } catch (error) {
@@ -703,7 +898,7 @@ function initializeAdvancedFloor() {
             lastSeenX: jadeCell.x, lastSeenY: jadeCell.y
         };
     }
-    if (currentFloor === 3) {
+    if (currentFloor >= 3) {
         let shellCell = getRandomOpenCell(openCells, [player, centerZone, giraffe, redJade]);
         evilShell = {
             x: shellCell.x, y: shellCell.y, size: 22, angle: 0,
@@ -712,10 +907,19 @@ function initializeAdvancedFloor() {
             lastSeenX: shellCell.x, lastSeenY: shellCell.y
         };
     }
+    if (currentFloor >= 4) {
+        const pavilionCells = openCells.filter(isOpenThreeByThreeCell);
+        const pavilionCell = getRandomOpenCell(
+            pavilionCells.length > 0 ? pavilionCells : openCells,
+            [player, centerZone, giraffe, redJade, evilShell]
+        );
+        rainSystem.pavilion = { x: pavilionCell.x, y: pavilionCell.y };
+    }
 
     let used = [playerCell, centerCell, giraffeCell];
     if (jadeCell) used.push(jadeCell);
     if (evilShell) used.push(evilShell);
+    if (rainSystem && rainSystem.pavilion) used.push(rainSystem.pavilion);
     tablets = [];
     for (let room of secondFloorRooms.filter(room => !(room.left === prisonRoom.left &&
         room.right === prisonRoom.right && room.top === prisonRoom.top && room.bottom === prisonRoom.bottom))) {
@@ -761,6 +965,12 @@ function getRandomItem() {
 function initGame(floor = 1) {
     gameState = { over: false, won: false, transition: false, floor: floor };
     parseMap(floor);
+    rainSystem = floor >= 4
+        ? { progress: 50, raining: false, tick: 0, pavilionTick: 0,
+            pavilion: null, pavilionOccupied: false, puddles: [] }
+        : null;
+    rainUI.style.display = rainSystem ? 'flex' : 'none';
+    updateRainProgressUI();
     soundWaves = [];
     doorTimers = {};
     deployedItems = [];
@@ -782,7 +992,7 @@ function initGame(floor = 1) {
         isMoving: false, itemNoiseTimer: 0, inPrison: false, prisonTimer: 0,
         inPrisonRoom: false, stamina: getStaminaMaximum(), sprintRecoveryDelay: 0,
         sprintExhausted: false, isRunning: false, savedX: 0, savedY: 0,
-        easyModeGraceTimer: 0
+        easyModeGraceTimer: 0, pavilionSlowTimer: 0
     };
     
     // 長頸鹿
@@ -793,8 +1003,11 @@ function initGame(floor = 1) {
         lastSeenX: 225, lastSeenY: 525, lastSeenAngle: 0,
         lostTargetX: 225, lostTargetY: 525,
         path: [], pathTimer: 0, pathGoalX: -1, pathGoalY: -1, lostSearchIndex: 0, lostPredictionSet: false, searchedRoom: false,
-        ccTimer: 0, ccType: ""
+        ccTimer: 0, ccType: "", wallPhaseTimer: 0
     };
+    giraffeClone = null;
+    giraffeCloneTimer = 0;
+    if (rainSystem) rainSystem.pavilionOccupied = false;
     
     centerZone = { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, size: 45, delivered: 0 };
 
@@ -823,7 +1036,7 @@ function initGame(floor = 1) {
             { x: 20*50+25, y: 26*50+25, item: getRandomItem(), active: true }
         ];
     } else {
-        floorUI.innerText = `📍 樓層: 第${floor === 2 ? '二' : '三'}層`;
+        floorUI.innerText = `📍 樓層: 第${['', '一', '二', '三', '四'][floor] || floor}層`;
         initializeAdvancedFloor();
     }
 
@@ -1044,8 +1257,12 @@ function useCurrentItem() {
         let pt = getThrowPoint(player.x, player.y, player.angle, 150);
         let flashRange = 200 * getModeSetting('soundRange');
         soundWaves.push({ x: pt.x, y: pt.y, radius: 10, maxRadius: flashRange, alpha: 1, isFlash: true });
-        if (Math.hypot(giraffe.x - pt.x, giraffe.y - pt.y) < flashRange) {
-            giraffe.ccTimer = 300; giraffe.ccType = 'STROBE'; giraffe.path = [];
+        for (const entity of getActiveGiraffes()) {
+            if (Math.hypot(entity.x - pt.x, entity.y - pt.y) < flashRange) {
+                entity.ccTimer = 300;
+                entity.ccType = 'STROBE';
+                entity.path = [];
+            }
         }
     } else if (type === 'DOLL') {
         deployedItems.push({ x: player.x, y: player.y, type: 'DOLL', expired: false });
@@ -1188,7 +1405,7 @@ function finishShellWordQuiz() {
 }
 
 function updateEvilShell() {
-    if (currentFloor !== 3 || !evilShell) return false;
+    if (currentFloor < 3 || !evilShell) return false;
     const canCapture = Date.now() >= evilShell.cooldownUntil;
     const seesPlayer = canCapture && !player.inPrison && canEnemySeePlayer(evilShell);
     if (seesPlayer) {
@@ -1387,8 +1604,12 @@ function triggerMysteryBox() {
         player.drinkTimer = 720; player.boxTimer = 720; player.mysterySpeedTimer = 720;
         showNotice("🎲 神秘盒子：【全面超載】獲得 12秒 隱形與雙倍神速！");
     } else if (r < 0.66) {
-        giraffe.ccTimer = 900; giraffe.ccType = 'MYSTERY_SLEEP'; giraffe.path = [];
-        showNotice("🎲 神秘盒子：【終極癱瘓】長頸鹿陷入 15秒 深度睡眠！");
+        for (const entity of getActiveGiraffes()) {
+            entity.ccTimer = 900;
+            entity.ccType = 'MYSTERY_SLEEP';
+            entity.path = [];
+        }
+        showNotice("🎲 神秘盒子：【終極癱瘓】所有長頸鹿陷入 15秒 深度睡眠！");
     } else {
         let uncollected = tablets.filter(t => !t.pickedUp), count = 0;
         for (let t of uncollected) {
@@ -1417,6 +1638,7 @@ function handleMovement() {
     let speedMult = 1.0;
     if (player.drinkTimer > 0) speedMult += 0.5;
     if (player.mysterySpeedTimer > 0) speedMult += 0.5;
+    if (player.pavilionSlowTimer > 0) speedMult *= 0.5;
     let sprintInput = selectedGameMode !== 'hell' &&
         (keys['shift'] || touchSprintActive) && !player.sprintExhausted;
     let wantsToSprint = sprintInput && player.stamina > 0 && (dx !== 0 || dy !== 0);
@@ -1466,7 +1688,7 @@ function handleMovement() {
         if (!(keys['shift'] || touchSprintActive)) player.sprintExhausted = false;
     }
     let staminaMaximum = getStaminaMaximum();
-    staminaBar.style.width = `${player.stamina / staminaMaximum * 100}%`;
+    staminaBar.style.setProperty('--progress', `${player.stamina / staminaMaximum * 100}%`);
     staminaBar.style.background = player.stamina < staminaMaximum * 0.2 ? '#ff5252' : '#76ff03';
     if (player.inPrisonRoom &&
         (Math.floor(player.x / TILE_SIZE) < prisonRoom.left ||
@@ -1480,10 +1702,15 @@ function handleMovement() {
 function triggerSound(x, y, maxRadius = 450, gridRange = 0, soundType = 'item') {
     let soundMultiplier = getModeSetting('soundRange');
     let shellSoundSide = 0;
+    let puddleSoundSide = 0;
     if (soundType === 'shell') {
         shellSoundSide = 20 * currentFloor * soundMultiplier;
         maxRadius = Math.hypot(shellSoundSide * TILE_SIZE / 2, shellSoundSide * TILE_SIZE / 2);
         gridRange = shellSoundSide;
+    } else if (soundType === 'puddle') {
+        puddleSoundSide = Math.max(1, Math.round(gridRange * soundMultiplier));
+        maxRadius = Math.hypot(puddleSoundSide * TILE_SIZE / 2, puddleSoundSide * TILE_SIZE / 2);
+        gridRange = puddleSoundSide;
     } else {
         maxRadius *= soundMultiplier;
         if (gridRange > 0) gridRange = (gridRange + 0.5) * soundMultiplier;
@@ -1509,6 +1736,13 @@ function triggerSound(x, y, maxRadius = 450, gridRange = 0, soundType = 'item') 
         let enemyGridY = Math.floor(giraffe.y / TILE_SIZE);
         canHear = enemyGridX >= left && enemyGridX < left + shellSoundSide &&
             enemyGridY >= top && enemyGridY < top + shellSoundSide;
+    } else if (soundType === 'puddle') {
+        let left = Math.floor(x / TILE_SIZE) - Math.floor(puddleSoundSide / 2);
+        let top = Math.floor(y / TILE_SIZE) - Math.floor(puddleSoundSide / 2);
+        let enemyGridX = Math.floor(giraffe.x / TILE_SIZE);
+        let enemyGridY = Math.floor(giraffe.y / TILE_SIZE);
+        canHear = enemyGridX >= left && enemyGridX < left + puddleSoundSide &&
+            enemyGridY >= top && enemyGridY < top + puddleSoundSide;
     } else if (gridRange > 0) {
         canHear = Math.abs(giraffe.x - x) <= gridRange * TILE_SIZE &&
             Math.abs(giraffe.y - y) <= gridRange * TILE_SIZE;
@@ -1518,16 +1752,126 @@ function triggerSound(x, y, maxRadius = 450, gridRange = 0, soundType = 'item') 
     if (giraffe.ccTimer <= 0 && giraffe.state !== 'CHASE' && canHear) {
         giraffe.state = 'INVESTIGATE'; giraffe.targetX = x; giraffe.targetY = y; giraffe.path = []; giraffe.searchedRoom = false;
     }
-    if (soundType === 'shell' && redJade &&
-        Math.abs(redJade.x - x) <= shellSoundSide * TILE_SIZE / 2 &&
-        Math.abs(redJade.y - y) <= shellSoundSide * TILE_SIZE / 2) {
+    if (giraffeClone && giraffeClone.ccTimer <= 0 && giraffeClone.state !== 'CHASE') {
+        let cloneCanHear;
+        if (soundType === 'door') {
+            let side = Math.max(1, Math.round(currentFloor * 30 * soundMultiplier));
+            let left = Math.floor(x / TILE_SIZE) - Math.floor(side / 2);
+            let top = Math.floor(y / TILE_SIZE) - Math.floor(side / 2);
+            let enemyGridX = Math.floor(giraffeClone.x / TILE_SIZE);
+            let enemyGridY = Math.floor(giraffeClone.y / TILE_SIZE);
+            cloneCanHear = enemyGridX >= left && enemyGridX < left + side &&
+                enemyGridY >= top && enemyGridY < top + side;
+        } else if (soundType === 'shell' || soundType === 'puddle') {
+            const side = soundType === 'shell' ? shellSoundSide : puddleSoundSide;
+            let left = Math.floor(x / TILE_SIZE) - Math.floor(side / 2);
+            let top = Math.floor(y / TILE_SIZE) - Math.floor(side / 2);
+            let enemyGridX = Math.floor(giraffeClone.x / TILE_SIZE);
+            let enemyGridY = Math.floor(giraffeClone.y / TILE_SIZE);
+            cloneCanHear = enemyGridX >= left && enemyGridX < left + side &&
+                enemyGridY >= top && enemyGridY < top + side;
+        } else if (gridRange > 0) {
+            cloneCanHear = Math.abs(giraffeClone.x - x) <= gridRange * TILE_SIZE &&
+                Math.abs(giraffeClone.y - y) <= gridRange * TILE_SIZE;
+        } else {
+            cloneCanHear = Math.hypot(giraffeClone.x - x, giraffeClone.y - y) <= maxRadius;
+        }
+        if (cloneCanHear) {
+            giraffeClone.state = 'INVESTIGATE';
+            giraffeClone.targetX = x;
+            giraffeClone.targetY = y;
+            giraffeClone.path = [];
+            giraffeClone.searchedRoom = false;
+        }
+    }
+    const redJadeSoundSide = soundType === 'shell' ? shellSoundSide : puddleSoundSide;
+    if (redJadeSoundSide > 0 && redJade &&
+        Math.abs(redJade.x - x) <= redJadeSoundSide * TILE_SIZE / 2 &&
+        Math.abs(redJade.y - y) <= redJadeSoundSide * TILE_SIZE / 2) {
         redJade.alertedTimer = Math.max(redJade.alertedTimer, 300);
         redJade.lastSeenX = x;
         redJade.lastSeenY = y;
     }
 }
 
+function moveGiraffeToSafeCell(entity) {
+    let safeCells = getOpenCells().filter(cell =>
+        !checkWallCollision(cell.x, cell.y, entity.size));
+    if (safeCells.length === 0) {
+        for (let y = 1; y < mapGrid.length - 1; y++) {
+            for (let x = 1; x < mapGrid[y].length - 1; x++) {
+                if (mapGrid[y][x] !== 0 && mapGrid[y][x] !== 2 && mapGrid[y][x] !== 3) continue;
+                const cell = { x: x * TILE_SIZE + TILE_SIZE / 2, y: y * TILE_SIZE + TILE_SIZE / 2 };
+                if (!checkWallCollision(cell.x, cell.y, entity.size)) safeCells.push(cell);
+            }
+        }
+    }
+    if (safeCells.length === 0) {
+        throw new Error('無法找到長頸鹿離開牆面的安全位置。');
+    }
+    const safeCell = getNearestOpenCell(entity.x, entity.y, safeCells);
+    entity.x = safeCell.x;
+    entity.y = safeCell.y;
+    entity.targetX = safeCell.x;
+    entity.targetY = safeCell.y;
+    entity.path = [];
+    entity.pathTimer = 0;
+    entity.pathGoalX = -1;
+    entity.pathGoalY = -1;
+}
+
+function createGiraffeClone() {
+    const cloneCell = getRandomOpenCell(getOpenCells(), [player, giraffe]);
+    giraffeClone = {
+        ...giraffe,
+        x: cloneCell.x,
+        y: cloneCell.y,
+        targetX: cloneCell.x,
+        targetY: cloneCell.y,
+        state: 'PATROL',
+        sightTimer: 0,
+        lostTimer: 0,
+        path: [],
+        pathTimer: 0,
+        pathGoalX: -1,
+        pathGoalY: -1,
+        ccTimer: 0,
+        ccType: '',
+        wallPhaseTimer: 0
+    };
+    giraffeCloneTimer = 20 * 60;
+}
+
+function updateGiraffeEntities() {
+    updateGiraffeAI();
+    if (!giraffeClone) return;
+
+    const primaryGiraffe = giraffe;
+    const primaryStatus = statusUI.innerText;
+    giraffe = giraffeClone;
+    updateGiraffeAI();
+    giraffeClone = giraffe;
+    giraffe = primaryGiraffe;
+    giraffeCloneTimer--;
+    statusUI.innerText = `${primaryStatus} · 🦒 分身 ${Math.ceil(giraffeCloneTimer / 60)} 秒`;
+    if (giraffeCloneTimer <= 0) {
+        giraffeClone = null;
+        giraffeCloneTimer = 0;
+        showNotice('數學魔咒結束，長頸鹿分身消失了。');
+    }
+}
+
+function getActiveGiraffes() {
+    return giraffeClone ? [giraffe, giraffeClone] : [giraffe];
+}
+
 function updateGiraffeAI() {
+    if (giraffe.wallPhaseTimer > 0) {
+        giraffe.wallPhaseTimer--;
+        if (giraffe.wallPhaseTimer === 0) moveGiraffeToSafeCell(giraffe);
+    }
+    const canPassWalls = giraffe.wallPhaseTimer > 0;
+
     // 若處於控場狀態
     if (giraffe.ccTimer > 0) {
         giraffe.ccTimer--;
@@ -1537,6 +1881,7 @@ function updateGiraffeAI() {
         if (giraffe.ccType === 'DOLL') label = "🧸 正深情看著長頸鹿玩偶... (8秒)";
         if (giraffe.ccType === 'MYSTERY_SLEEP') label = "💤 陷入神祕催眠深度沉睡... (15秒)";
         if (giraffe.ccType === 'EASY_FIRST_HIT') label = "😵 簡單模式保護：長頸鹿暈眩中 (3秒)";
+        if (giraffe.ccType === 'SUPER_EASY_GRACE') label = "😵 超簡單模式保護：長頸鹿暈眩中";
         statusUI.innerText = "🦒 長頸鹿狀態: " + label;
         return;
     }
@@ -1620,8 +1965,10 @@ function updateGiraffeAI() {
 
     let currentSpeed = giraffe.patrolSpeed;
     if (giraffe.state === 'CHASE') {
-        if (canSeePlayer) {
-            let target = getClearGiraffeTarget(player.x, player.y);
+        if (canSeePlayer || (canPassWalls && !isPlayerHidden)) {
+            let target = canPassWalls
+                ? { x: player.x, y: player.y }
+                : getClearGiraffeTarget(player.x, player.y);
             giraffe.targetX = target.x;
             giraffe.targetY = target.y;
         }
@@ -1647,8 +1994,8 @@ function updateGiraffeAI() {
     giraffe.pathTimer++;
     let pathGoalX = Math.floor(giraffe.targetX / TILE_SIZE);
     let pathGoalY = Math.floor(giraffe.targetY / TILE_SIZE);
-    if (giraffe.pathTimer % 15 === 0 || giraffe.path.length === 0 ||
-        pathGoalX !== giraffe.pathGoalX || pathGoalY !== giraffe.pathGoalY) {
+    if (!canPassWalls && (giraffe.pathTimer % 15 === 0 || giraffe.path.length === 0 ||
+        pathGoalX !== giraffe.pathGoalX || pathGoalY !== giraffe.pathGoalY)) {
         let route = findGiraffePath(Math.floor(giraffe.x/TILE_SIZE), Math.floor(giraffe.y/TILE_SIZE), pathGoalX, pathGoalY);
         giraffe.path = route.path;
         if (route.path.length > 0 && (route.x !== pathGoalX || route.y !== pathGoalY)) {
@@ -1661,10 +2008,15 @@ function updateGiraffeAI() {
         }
         giraffe.pathGoalX = Math.floor(giraffe.targetX / TILE_SIZE);
         giraffe.pathGoalY = Math.floor(giraffe.targetY / TILE_SIZE);
+    } else if (canPassWalls) {
+        giraffe.path = [];
     }
 
     let nextX = giraffe.x, nextY = giraffe.y;
-    if (giraffe.path && giraffe.path.length > 1) {
+    if (canPassWalls) {
+        nextX = giraffe.targetX;
+        nextY = giraffe.targetY;
+    } else if (giraffe.path && giraffe.path.length > 1) {
         let [fromGridX, fromGridY] = giraffe.path[0];
         let [toGridX, toGridY] = giraffe.path[1];
         let waypointX = toGridX * TILE_SIZE + TILE_SIZE / 2;
@@ -1705,13 +2057,19 @@ function updateGiraffeAI() {
         let stepX = (deltaX / distance) * Math.min(currentSpeed, distance);
         let stepY = (deltaY / distance) * Math.min(currentSpeed, distance);
         giraffe.angle = Math.atan2(deltaY, deltaX);
-        if (Math.abs(stepX) > 0.001 && !checkWallCollision(giraffe.x + stepX, giraffe.y, giraffe.size)) {
+        if (canPassWalls) {
             giraffe.x += stepX;
-            moved = true;
-        }
-        if (Math.abs(stepY) > 0.001 && !checkWallCollision(giraffe.x, giraffe.y + stepY, giraffe.size)) {
             giraffe.y += stepY;
             moved = true;
+        } else {
+            if (Math.abs(stepX) > 0.001 && !checkWallCollision(giraffe.x + stepX, giraffe.y, giraffe.size)) {
+                giraffe.x += stepX;
+                moved = true;
+            }
+            if (Math.abs(stepY) > 0.001 && !checkWallCollision(giraffe.x, giraffe.y + stepY, giraffe.size)) {
+                giraffe.y += stepY;
+                moved = true;
+            }
         }
         if (!moved) {
             giraffe.path = [];
@@ -1746,6 +2104,159 @@ function pickNextPatrolWaypoint() {
     giraffe.path = [];
 }
 
+function updateRainProgressUI() {
+    if (!rainSystem) return;
+    const progress = Math.round(rainSystem.progress);
+    rainProgressText.innerText = `${progress}%${rainSystem.raining ? '（下雨中）' : ''}`;
+    rainBar.style.setProperty('--progress', `${progress}%`);
+    rainBar.style.background = rainSystem.raining ? '#29b6f6' : '#ffca28';
+}
+
+function getReachableOpenCellsFromPlayer() {
+    const rows = mapGrid.length;
+    const columns = mapGrid[0].length;
+    let startX = Math.floor(player.x / TILE_SIZE);
+    let startY = Math.floor(player.y / TILE_SIZE);
+    if (!mapGrid[startY] || mapGrid[startY][startX] === 1) {
+        const nearest = getNearestOpenCell(player.x, player.y);
+        startX = nearest.gridX;
+        startY = nearest.gridY;
+    }
+
+    const queue = [[startX, startY]];
+    const visited = new Set([startY * columns + startX]);
+    const reachable = [];
+    for (let index = 0; index < queue.length; index++) {
+        const [x, y] = queue[index];
+        if (mapGrid[y][x] === 0 &&
+            !(prisonRoom && x > prisonRoom.left && x < prisonRoom.right &&
+                y > prisonRoom.top && y < prisonRoom.bottom)) {
+            reachable.push({
+                x: x * TILE_SIZE + TILE_SIZE / 2,
+                y: y * TILE_SIZE + TILE_SIZE / 2,
+                gridX: x,
+                gridY: y
+            });
+        }
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nextX = x + dx;
+            const nextY = y + dy;
+            const key = nextY * columns + nextX;
+            if (nextY < 0 || nextY >= rows || nextX < 0 || nextX >= columns ||
+                mapGrid[nextY][nextX] === 1 || visited.has(key)) continue;
+            visited.add(key);
+            queue.push([nextX, nextY]);
+        }
+    }
+    return reachable;
+}
+
+function spawnRainPuddle() {
+    const candidates = getReachableOpenCellsFromPlayer().filter(cell =>
+        isOpenThreeByThreeCell(cell) &&
+        !isInsideThreeByThreeFootprint(player, cell.x, cell.y) &&
+        rainSystem.puddles.every(puddle => !footprintsOverlapThreeByThree(cell, puddle)) &&
+        !overlapsVisibleItem(cell) &&
+        (!rainSystem.pavilion || !footprintsOverlapThreeByThree(cell, rainSystem.pavilion)));
+    if (candidates.length === 0) return;
+    const cell = candidates[Math.floor(Math.random() * candidates.length)];
+    rainSystem.puddles.push({ x: cell.x, y: cell.y, timer: 30 * 60 });
+}
+
+function refreshMathRainPavilion() {
+    const reachableCells = getReachableOpenCellsFromPlayer();
+    const previous = rainSystem.pavilion;
+    const openCells = reachableCells.filter(cell =>
+        isOpenThreeByThreeCell(cell) &&
+        rainSystem.puddles.every(puddle => !footprintsOverlapThreeByThree(cell, puddle)) &&
+        !overlapsVisibleItem(cell));
+    const candidates = openCells.filter(cell =>
+        !previous || Math.hypot(cell.x - previous.x, cell.y - previous.y) >= TILE_SIZE * 5);
+    const pool = candidates.length > 0 ? candidates : openCells;
+    if (pool.length > 0) {
+        const cell = pool[Math.floor(Math.random() * pool.length)];
+        rainSystem.pavilion = { x: cell.x, y: cell.y };
+        rainSystem.pavilionOccupied = false;
+    }
+    rainSystem.pavilionTick = 0;
+}
+
+function activateMathPavilionCurse() {
+    const curse = Math.floor(Math.random() * 3);
+    if (curse === 0) {
+        player.pavilionSlowTimer = 30 * 60;
+        showNotice('數學魔咒：昏睡咒！移動速度降低 50%，持續 30 秒。');
+    } else if (curse === 1) {
+        createGiraffeClone();
+        showNotice('數學魔咒：1=2！長頸鹿分身出現 20 秒。');
+    } else {
+        [giraffe, giraffeClone].filter(Boolean).forEach(entity => {
+            entity.wallPhaseTimer = 20 * 60;
+            entity.path = [];
+            entity.pathTimer = 0;
+            entity.pathGoalX = -1;
+            entity.pathGoalY = -1;
+        });
+        showNotice('數學魔咒：直線距離最短！長頸鹿可穿牆 20 秒。');
+    }
+}
+
+function updateRainSystem() {
+    if (!rainSystem || mainMenu.style.display !== 'none') return;
+
+    rainSystem.tick++;
+    rainSystem.pavilionTick++;
+    if (rainSystem.pavilionTick >= 20 * 60) refreshMathRainPavilion();
+    let pavilionActivated = false;
+
+    for (let index = rainSystem.puddles.length - 1; index >= 0; index--) {
+        const puddle = rainSystem.puddles[index];
+        puddle.timer--;
+        if (puddle.timer <= 0) {
+            rainSystem.puddles.splice(index, 1);
+            rainSystem.progress = Math.min(100, rainSystem.progress + 4);
+        } else if (!player.inPrison && isInsideThreeByThreeFootprint(player, puddle.x, puddle.y)) {
+            rainSystem.puddles.splice(index, 1);
+            rainSystem.progress = Math.min(100, rainSystem.progress + 2);
+            triggerSound(puddle.x, puddle.y, 0, 10 + currentFloor * 10, 'puddle');
+        }
+    }
+
+    const atPavilion = rainSystem.pavilion && !player.inPrison &&
+        isInsideThreeByThreeFootprint(player, rainSystem.pavilion.x, rainSystem.pavilion.y);
+    if (!atPavilion) {
+        rainSystem.pavilionOccupied = false;
+    } else if (!rainSystem.pavilionOccupied) {
+        rainSystem.pavilionOccupied = true;
+        pavilionActivated = true;
+        if (rainSystem.raining) {
+            rainSystem.raining = false;
+            rainSystem.progress = 0;
+            showNotice('數學雨亭生效！雨停了，下雨進度歸零。');
+        } else {
+            activateMathPavilionCurse();
+        }
+    }
+
+    if (!pavilionActivated && rainSystem.tick % 60 === 0) {
+        if (rainSystem.raining) {
+            rainSystem.progress = Math.max(0, rainSystem.progress - 2);
+            if (Math.random() < 0.2) spawnRainPuddle();
+            if (rainSystem.progress === 0) {
+                rainSystem.raining = false;
+                showNotice('雨勢停止了。');
+            }
+        } else {
+            rainSystem.progress = Math.min(100, rainSystem.progress + 1);
+            if (rainSystem.progress === 100) {
+                rainSystem.raining = true;
+                showNotice('雨勢增強！地面可能形成水坑。');
+            }
+        }
+    }
+    updateRainProgressUI();
+}
+
 function update() {
     if (gameState.over || gameState.won || gameState.transition) return;
 
@@ -1759,10 +2270,12 @@ function update() {
     }
 
     if (player.easyModeGraceTimer > 0) player.easyModeGraceTimer--;
+    if (player.pavilionSlowTimer > 0) player.pavilionSlowTimer--;
     if (!player.inPrison) handleMovement();
     updateRedJade();
     if (updateEvilShell()) return;
-    updateGiraffeAI();
+    updateGiraffeEntities();
+    updateRainSystem();
     if (player.inPrison) {
         statusUI.innerText = `🔴 小黑屋：${Math.ceil(player.prisonTimer / 60)} 秒後解鎖`;
     }
@@ -1789,8 +2302,14 @@ function update() {
     // 更新拋出/放置類道具
     deployedItems.forEach(item => {
         if (item.type === 'BANANA') {
-            if (Math.hypot(giraffe.x - item.x, giraffe.y - item.y) < giraffe.size + 12 && giraffe.ccTimer <= 0) {
-                giraffe.ccTimer = 180; giraffe.ccType = 'BANANA'; item.expired = true; giraffe.path = [];
+            for (const entity of getActiveGiraffes()) {
+                if (Math.hypot(entity.x - item.x, entity.y - item.y) < entity.size + 12 && entity.ccTimer <= 0) {
+                    entity.ccTimer = 180;
+                    entity.ccType = 'BANANA';
+                    item.expired = true;
+                    entity.path = [];
+                    break;
+                }
             }
         } else if (item.type === 'ALARM') {
             item.timer--;
@@ -1823,7 +2342,8 @@ function update() {
     // 音波擴散
     for (let i = soundWaves.length - 1; i >= 0; i--) {
         let wave = soundWaves[i];
-        if (wave.soundType === 'door' || wave.soundType === 'prison' || wave.soundType === 'shell') {
+        if (wave.soundType === 'door' || wave.soundType === 'prison' ||
+            wave.soundType === 'shell' || wave.soundType === 'puddle') {
             wave.radius += wave.maxRadius / 90;
             wave.alpha -= 1 / 90;
         } else {
@@ -1861,31 +2381,94 @@ function update() {
     deliveredTotalUI.innerText = tablets.length;
 
     if (centerZone.delivered === tablets.length) {
-        if (currentFloor < 3) {
+        if (currentFloor < 4) {
             gameState.transition = true;
             showNotice(`💥 地板爆裂！正在墜入第 ${currentFloor + 1} 層…`);
             unlockNextFloorAndContinue(currentFloor + 1);
         } else {
             gameState.won = true;
-            endGame("🎉 成功回收第三層的所有實驗數據平板！");
+            endGame("🎉 成功回收第四層的所有實驗數據平板！");
         }
         return;
     }
-    if (!player.inPrison &&
-        Math.hypot(player.x - giraffe.x, player.y - giraffe.y) < player.size + giraffe.size) {
-        if (selectedGameMode === 'easy' && !easyModeFirstHitUsed) {
+    const catchingGiraffe = [giraffe, giraffeClone].filter(Boolean).find(entity =>
+        !player.inPrison &&
+        Math.hypot(player.x - entity.x, player.y - entity.y) < player.size + entity.size);
+    if (catchingGiraffe) {
+        if (selectedGameMode === 'superEasy' && superEasyCatchCount < 3) {
+            superEasyCatchCount++;
+            player.easyModeGraceTimer = 60;
+            catchingGiraffe.ccTimer = 60;
+            catchingGiraffe.ccType = 'SUPER_EASY_GRACE';
+            catchingGiraffe.state = 'PATROL';
+            catchingGiraffe.path = [];
+            showNotice(`超簡單模式保護！${superEasyCatchCount} / 3 次被抓不會死亡，怪物暈眩 1 秒。`);
+        } else if (selectedGameMode === 'easy' && !easyModeFirstHitUsed) {
             easyModeFirstHitUsed = true;
             player.easyModeGraceTimer = 180;
-            giraffe.ccTimer = 180;
-            giraffe.ccType = 'EASY_FIRST_HIT';
-            giraffe.state = 'PATROL';
-            giraffe.path = [];
+            catchingGiraffe.ccTimer = 180;
+            catchingGiraffe.ccType = 'EASY_FIRST_HIT';
+            catchingGiraffe.state = 'PATROL';
+            catchingGiraffe.path = [];
             showNotice('簡單模式保護！首次被抓不會死亡，長頸鹿暈眩 3 秒。');
         } else if (player.easyModeGraceTimer <= 0) {
             gameState.over = true;
             endGame("🦒 被長頸鹿正面撲倒了！實驗失敗。");
         }
     }
+}
+
+function drawGiraffeEntity(entity, isClone = false) {
+    ctx.save();
+    ctx.translate(entity.x, entity.y);
+    ctx.rotate(entity.angle);
+    if (showMonsterVision.checked) {
+        ctx.fillStyle = isClone ? 'rgba(171, 71, 188, 0.1)' : 'rgba(255, 167, 38, 0.08)';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, 375, -Math.PI / 3, Math.PI / 3);
+        ctx.closePath();
+        ctx.fill();
+    }
+    ctx.fillStyle = isClone ? '#ce93d8' : '#ffa726';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, entity.size * 1.2, entity.size, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#5d4037';
+    ctx.beginPath();
+    ctx.arc(-8, -6, 5, 0, Math.PI * 2);
+    ctx.arc(6, 6, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = isClone ? '#ce93d8' : '#ffa726';
+    ctx.fillRect(10, -6, 30, 12);
+    ctx.fillStyle = isClone ? '#ab47bc' : '#fb8c00';
+    ctx.beginPath();
+    ctx.ellipse(40, 0, 11, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(43, -3, 3, 0, Math.PI * 2);
+    ctx.arc(43, 4, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(44, -3, 1.5, 0, Math.PI * 2);
+    ctx.arc(44, 4, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    if (entity.state === 'CHASE' && entity.ccTimer <= 0) {
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.45)';
+        ctx.beginPath();
+        ctx.arc(38, 0, 16, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    if (isClone) {
+        ctx.strokeStyle = '#ea80fc';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, entity.size + 5, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+    ctx.restore();
 }
 
 function draw() {
@@ -1912,6 +2495,46 @@ function draw() {
             } else {
                 ctx.fillStyle = '#0f0f12'; ctx.fillRect(rx, ry, TILE_SIZE, TILE_SIZE);
             }
+        }
+    }
+
+    if (rainSystem) {
+        rainSystem.puddles.forEach(puddle => {
+            ctx.save();
+            const puddleSize = TILE_SIZE * 3;
+            ctx.fillStyle = 'rgba(3, 169, 244, 0.35)';
+            ctx.strokeStyle = 'rgba(128, 222, 234, 0.9)';
+            ctx.lineWidth = 2;
+            ctx.fillRect(puddle.x - puddleSize / 2, puddle.y - puddleSize / 2, puddleSize, puddleSize);
+            ctx.strokeRect(puddle.x - puddleSize / 2, puddle.y - puddleSize / 2, puddleSize, puddleSize);
+            ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+            ctx.beginPath();
+            ctx.ellipse(puddle.x, puddle.y, 24, 12, -0.25, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        });
+
+        if (rainSystem.pavilion) {
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const pavilionSize = TILE_SIZE * 3;
+            ctx.fillStyle = 'rgba(0, 96, 100, 0.38)';
+            ctx.strokeStyle = 'rgba(128, 222, 234, 0.95)';
+            ctx.lineWidth = 3;
+            ctx.fillRect(rainSystem.pavilion.x - pavilionSize / 2,
+                rainSystem.pavilion.y - pavilionSize / 2, pavilionSize, pavilionSize);
+            ctx.strokeRect(rainSystem.pavilion.x - pavilionSize / 2,
+                rainSystem.pavilion.y - pavilionSize / 2, pavilionSize, pavilionSize);
+            ctx.font = '42px Arial';
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = '#80deea';
+            ctx.fillText('🏕️', rainSystem.pavilion.x, rainSystem.pavilion.y - 16);
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#b2ebf2';
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText('數學雨亭', rainSystem.pavilion.x, rainSystem.pavilion.y + 42);
+            ctx.restore();
         }
     }
 
@@ -1964,6 +2587,16 @@ function draw() {
             ctx.setLineDash([8, 8]);
             ctx.strokeRect(wave.x - side / 2, wave.y - side / 2, side, side);
             ctx.strokeStyle = `rgba(255, 82, 82, ${wave.alpha})`;
+            ctx.setLineDash([]);
+            ctx.strokeRect(wave.x - wave.radius, wave.y - wave.radius,
+                wave.radius * 2, wave.radius * 2);
+        } else if (wave.soundType === 'puddle') {
+            let side = wave.gridRange * TILE_SIZE;
+            ctx.strokeStyle = 'rgba(3, 169, 244, 0.25)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 8]);
+            ctx.strokeRect(wave.x - side / 2, wave.y - side / 2, side, side);
+            ctx.strokeStyle = `rgba(128, 222, 234, ${wave.alpha})`;
             ctx.setLineDash([]);
             ctx.strokeRect(wave.x - wave.radius, wave.y - wave.radius,
                 wave.radius * 2, wave.radius * 2);
@@ -2022,20 +2655,8 @@ function draw() {
     }
     ctx.restore();
 
-    // 畫長頸鹿
-    ctx.save(); ctx.translate(giraffe.x, giraffe.y); ctx.rotate(giraffe.angle);
-    if (showMonsterVision.checked) {
-        ctx.fillStyle = 'rgba(255, 167, 38, 0.08)';
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 375, -Math.PI/3, Math.PI/3); ctx.closePath(); ctx.fill();
-    }
-    ctx.fillStyle = '#ffa726'; ctx.beginPath(); ctx.ellipse(0, 0, giraffe.size * 1.2, giraffe.size, 0, 0, Math.PI * 2); ctx.fill(); 
-    ctx.fillStyle = '#5d4037'; ctx.beginPath(); ctx.arc(-8, -6, 5, 0, Math.PI*2); ctx.arc(6, 6, 5, 0, Math.PI*2); ctx.fill(); 
-    ctx.fillStyle = '#ffa726'; ctx.fillRect(10, -6, 30, 12); 
-    ctx.fillStyle = '#fb8c00'; ctx.beginPath(); ctx.ellipse(40, 0, 11, 8, 0, 0, Math.PI * 2); ctx.fill(); 
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(43, -3, 3, 0, Math.PI*2); ctx.arc(43, 4, 3, 0, Math.PI*2); ctx.fill(); 
-    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(44, -3, 1.5, 0, Math.PI*2); ctx.arc(44, 4, 1.5, 0, Math.PI*2); ctx.fill();
-    if (giraffe.state === 'CHASE' && giraffe.ccTimer <= 0) { ctx.fillStyle = 'rgba(255, 0, 0, 0.45)'; ctx.beginPath(); ctx.arc(38, 0, 16, 0, Math.PI*2); ctx.fill(); }
-    ctx.restore();
+    drawGiraffeEntity(giraffe);
+    if (giraffeClone) drawGiraffeEntity(giraffeClone, true);
 
     if (redJade) {
         ctx.save(); ctx.translate(redJade.x, redJade.y); ctx.rotate(redJade.angle);
@@ -2075,33 +2696,53 @@ function draw() {
     }
 
     if (player.inPrison) {
+        const prisonPanelWidth = 520;
+        const prisonPanelHeight = currentFloor >= 4 ? 500 : currentFloor >= 3 ? 410 : currentFloor >= 2 ? 350 : 270;
+        const panelLeft = prisonRoom.x - prisonPanelWidth / 2;
+        const panelTop = prisonRoom.y - prisonPanelHeight / 2;
         ctx.save();
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.94)';
-        ctx.fillRect(prisonRoom.x - 170, prisonRoom.y - 132, 340, 264);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.96)';
+        ctx.fillRect(panelLeft, panelTop, prisonPanelWidth, prisonPanelHeight);
         ctx.strokeStyle = '#546e7a';
         ctx.lineWidth = 3;
-        ctx.strokeRect(prisonRoom.x - 170, prisonRoom.y - 132, 340, 264);
+        ctx.strokeRect(panelLeft, panelTop, prisonPanelWidth, prisonPanelHeight);
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ff5252';
         ctx.font = 'bold 22px Arial';
-        ctx.fillText('小黑屋', prisonRoom.x, prisonRoom.y - 99);
+        ctx.fillText('小黑屋', prisonRoom.x, panelTop + 35);
         ctx.fillStyle = '#fff';
         ctx.font = '13px Arial';
-        ctx.fillText(`第 ${currentFloor} 層敵人資料`, prisonRoom.x, prisonRoom.y - 70);
-        ctx.textAlign = 'left';
+        ctx.fillText(`第 ${currentFloor} 層敵人資料`, prisonRoom.x, panelTop + 60);
+        ctx.textAlign = 'center';
+        let enemyTextY = panelTop + 95;
         ctx.fillStyle = '#ffcc80';
-        ctx.fillText('🦒 長頸鹿：120° 視野；看見玩家後高速追擊。', prisonRoom.x - 150, prisonRoom.y - 38);
-        if (currentFloor === 2) {
+        ctx.fillText('🦒 長頸鹿：120° 視野；發現玩家後高速追擊。', prisonRoom.x, enemyTextY);
+        enemyTextY += 32;
+        if (currentFloor >= 2) {
             ctx.fillStyle = '#ff8a80';
-            ctx.fillText('🔴 紅玉：巡邏時與玩家同速；看見奔跑或用道具', prisonRoom.x - 150, prisonRoom.y - 12);
-            ctx.fillText('會以 1.5 倍速追擊；每次收押增加 5 秒。', prisonRoom.x - 150, prisonRoom.y + 9);
+            ctx.fillText('🔴 紅玉：巡邏時與玩家同速；看見奔跑或用道具後', prisonRoom.x, enemyTextY);
+            ctx.fillText('以 1.5 倍速追擊；抓到玩家會關入小黑屋。', prisonRoom.x, enemyTextY + 20);
+            ctx.fillText('每次被抓的關押時間增加 5 秒。', prisonRoom.x, enemyTextY + 40);
+            enemyTextY += 68;
+        }
+        if (currentFloor >= 3) {
+            ctx.fillStyle = '#ce93d8';
+            ctx.fillText('🐚 邪惡貝殼：看見玩家後追逐，碰到才會抓人。', prisonRoom.x, enemyTextY);
+            ctx.fillText('抓到後進行 5 組中英配對；冷卻 60 ÷ 樓層秒。', prisonRoom.x, enemyTextY + 20);
+            enemyTextY += 48;
+        }
+        if (currentFloor >= 4) {
+            ctx.fillStyle = '#80deea';
+            ctx.fillText('🌧 下雨進度每秒增加 1%；滿 100% 開始下雨。', prisonRoom.x, enemyTextY);
+            ctx.fillText('雨中每秒減少 4%，水坑踩到發出大範圍聲音。', prisonRoom.x, enemyTextY + 20);
+            ctx.fillText('🏕️ 數學雨亭每 20 秒換位；下雨時碰到可停雨。', prisonRoom.x, enemyTextY + 40);
         }
         ctx.textAlign = 'center';
         ctx.fillStyle = '#80deea';
         ctx.font = 'bold 18px Arial';
-        ctx.fillText(`${Math.ceil(player.prisonTimer / 60)} 秒後解鎖`, prisonRoom.x, prisonRoom.y + 55);
+        ctx.fillText(`${Math.ceil(player.prisonTimer / 60)} 秒後解鎖`, prisonRoom.x, panelTop + prisonPanelHeight - 55);
         ctx.font = '12px Arial';
-        ctx.fillText('時間到後，從右側出口自行離開 →', prisonRoom.x, prisonRoom.y + 78);
+        ctx.fillText('時間到後，從右側出口自行離開 →', prisonRoom.x, panelTop + prisonPanelHeight - 30);
         ctx.restore();
     }
     if (player.inPrisonRoom && !player.inPrison) {
@@ -2116,6 +2757,12 @@ function draw() {
 
     ctx.restore();
 
+    if (rainSystem && rainSystem.raining) drawRainOverlay();
+
+    if (selectedGameMode === 'hell' && !gameState.over && !gameState.won) {
+        drawMiniMap();
+    }
+
     // 畫通知跑馬燈
     if (gameNotice.timer > 0) {
         ctx.save(); ctx.fillStyle = "rgba(0,0,0,0.75)"; ctx.fillRect(canvas.width/2 - 250, 20, 500, 35);
@@ -2123,6 +2770,93 @@ function draw() {
         ctx.fillStyle = "#fff"; ctx.font = "bold 14px Arial"; ctx.textAlign = "center";
         ctx.fillText(gameNotice.text, canvas.width/2, 42); ctx.restore();
     }
+}
+
+function drawRainOverlay() {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(110, 190, 255, 0.32)';
+    ctx.lineWidth = 1;
+    for (let index = 0; index < 85; index++) {
+        const x = (index * 97 + rainSystem.tick * 7) % canvas.width;
+        const y = (index * 53 + rainSystem.tick * 13) % canvas.height;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - 5, y + 13);
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
+function drawMiniMap() {
+    const padding = 10;
+    const panelWidth = 190;
+    const panelHeight = 238;
+    const panelX = canvas.width - panelWidth - 12;
+    const panelY = 60;
+    const mapX = panelX + padding;
+    const mapY = panelY + 27;
+    const mapWidth = panelWidth - padding * 2;
+    const mapHeight = panelHeight - 65;
+    const cellWidth = mapWidth / mapGrid[0].length;
+    const cellHeight = mapHeight / mapGrid.length;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.82)';
+    ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+    ctx.strokeStyle = 'rgba(255, 183, 77, 0.9)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+    ctx.fillStyle = '#ffcc80';
+    ctx.font = 'bold 13px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('地域模式小地圖', panelX + panelWidth / 2, panelY + 18);
+
+    for (let y = 0; y < mapGrid.length; y++) {
+        for (let x = 0; x < mapGrid[y].length; x++) {
+            ctx.fillStyle = mapGrid[y][x] === 1 ? '#54606a' :
+                mapGrid[y][x] === 2 || mapGrid[y][x] === 3 ? '#ffb74d' : '#182126';
+            ctx.fillRect(mapX + x * cellWidth, mapY + y * cellHeight,
+                Math.ceil(cellWidth), Math.ceil(cellHeight));
+        }
+    }
+
+    const drawMarker = (entity, color, radius = 2.5) => {
+        if (!entity) return;
+        const x = mapX + entity.x / TILE_SIZE * cellWidth;
+        const y = mapY + entity.y / TILE_SIZE * cellHeight;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+    };
+
+    tablets.forEach(tablet => {
+        if (!tablet.pickedUp) drawMarker(tablet, '#4dd0e1', 1.5);
+    });
+    drawMarker(centerZone, '#00e5ff', 3);
+    drawMarker(giraffe, '#ff9800', 3);
+    if (giraffeClone) drawMarker(giraffeClone, '#ea80fc', 3);
+    drawMarker(redJade, '#f44336', 3);
+    drawMarker(evilShell, '#ce93d8', 3);
+    drawMarker(player, '#76ff03', 3.5);
+
+    const legendY = mapY + mapHeight + 13;
+    ctx.font = '9px Arial';
+    ctx.textAlign = 'left';
+    [
+        { x: panelX + 10, color: '#76ff03', label: '玩家' },
+        { x: panelX + 55, color: '#ff9800', label: '長頸鹿' },
+        { x: panelX + 112, color: '#f44336', label: '紅玉' },
+        { x: panelX + 151, color: '#ce93d8', label: '貝殼' }
+    ].forEach(marker => {
+        ctx.fillStyle = marker.color;
+        ctx.beginPath();
+        ctx.arc(marker.x + 3, legendY - 3, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.fillText(marker.label, marker.x + 8, legendY);
+    });
+    ctx.restore();
 }
 
 function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
@@ -2135,8 +2869,12 @@ function startGame(floor = 1, preserveRun = false) {
         setAccountStatus('此樓層尚未解鎖。', true);
         return;
     }
-    if (!preserveRun) easyModeFirstHitUsed = false;
+    if (!preserveRun) {
+        easyModeFirstHitUsed = false;
+        superEasyCatchCount = 0;
+    }
     mainMenu.style.display = 'none';
+    document.getElementById('hud').classList.add('game-active');
     messageScreen.style.display = 'none';
     hideMessageAction();
     initGame(floor);
@@ -2150,6 +2888,7 @@ function endGame(msg) {
 function backToMenu() {
     hideMessageAction();
     messageScreen.style.display = 'none';
+    document.getElementById('hud').classList.remove('game-active');
     mainMenu.style.display = 'flex';
 }
 
@@ -2161,6 +2900,7 @@ accountNameInput.addEventListener('keydown', event => {
 floor1Button.addEventListener('click', () => startGame(1));
 floor2Button.addEventListener('click', () => startGame(2));
 floor3Button.addEventListener('click', () => startGame(3));
+floor4Button.addEventListener('click', () => startGame(4));
 gameModeInputs.forEach(input => {
     input.addEventListener('change', () => {
         if (input.checked) {
