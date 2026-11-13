@@ -675,31 +675,74 @@ function getOpenCells() {
     return cells;
 }
 
-function isOpenThreeByThreeCell(cell) {
-    for (let y = cell.gridY - 1; y <= cell.gridY + 1; y++) {
-        for (let x = cell.gridX - 1; x <= cell.gridX + 1; x++) {
-            if (!mapGrid[y] || mapGrid[y][x] !== 0 ||
-                (prisonRoom && x > prisonRoom.left && x < prisonRoom.right &&
-                    y > prisonRoom.top && y < prisonRoom.bottom)) return false;
+function isRainFeatureCellOpen(x, y) {
+    return !!mapGrid[y] && mapGrid[y][x] === 0 &&
+        !(prisonRoom && x > prisonRoom.left && x < prisonRoom.right &&
+            y > prisonRoom.top && y < prisonRoom.bottom);
+}
+
+function getRainFeatureCells(center) {
+    const centerX = center.gridX;
+    const centerY = center.gridY;
+    if (!isRainFeatureCellOpen(centerX, centerY)) return null;
+
+    const square = [];
+    for (let y = centerY - 1; y <= centerY + 1; y++) {
+        for (let x = centerX - 1; x <= centerX + 1; x++) {
+            if (!isRainFeatureCellOpen(x, y)) {
+                square.length = 0;
+                break;
+            }
+            square.push({ gridX: x, gridY: y, x: x * TILE_SIZE + TILE_SIZE / 2,
+                y: y * TILE_SIZE + TILE_SIZE / 2 });
+        }
+        if (square.length === 0) break;
+    }
+    if (square.length === 9) return square;
+
+    const cells = [{ gridX: centerX, gridY: centerY,
+        x: centerX * TILE_SIZE + TILE_SIZE / 2, y: centerY * TILE_SIZE + TILE_SIZE / 2 }];
+    const queue = [cells[0]];
+    const visited = new Set([centerY * mapGrid[0].length + centerX]);
+    for (let index = 0; index < queue.length && cells.length < 9; index++) {
+        const current = queue[index];
+        for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
+            const x = current.gridX + dx;
+            const y = current.gridY + dy;
+            const key = y * mapGrid[0].length + x;
+            if (Math.abs(x - centerX) > 4 || Math.abs(y - centerY) > 4 ||
+                visited.has(key) || !isRainFeatureCellOpen(x, y)) continue;
+            visited.add(key);
+            const cell = { gridX: x, gridY: y,
+                x: x * TILE_SIZE + TILE_SIZE / 2, y: y * TILE_SIZE + TILE_SIZE / 2 };
+            cells.push(cell);
+            queue.push(cell);
+            if (cells.length === 9) break;
         }
     }
-    return true;
+    return cells.length === 9 ? cells : null;
 }
 
-function isInsideThreeByThreeFootprint(entity, x, y) {
-    return Math.abs(Math.floor(entity.x / TILE_SIZE) - Math.floor(x / TILE_SIZE)) <= 1 &&
-        Math.abs(Math.floor(entity.y / TILE_SIZE) - Math.floor(y / TILE_SIZE)) <= 1;
+function createRainFeature(cell) {
+    const cells = getRainFeatureCells(cell);
+    return cells ? { ...cell, cells } : null;
 }
 
-function footprintsOverlapThreeByThree(first, second) {
-    return Math.abs(Math.floor(first.x / TILE_SIZE) - Math.floor(second.x / TILE_SIZE)) <= 2 &&
-        Math.abs(Math.floor(first.y / TILE_SIZE) - Math.floor(second.y / TILE_SIZE)) <= 2;
+function isInsideRainFeature(entity, feature) {
+    const gridX = Math.floor(entity.x / TILE_SIZE);
+    const gridY = Math.floor(entity.y / TILE_SIZE);
+    return feature.cells.some(cell => cell.gridX === gridX && cell.gridY === gridY);
 }
 
-function overlapsVisibleItem(cell) {
-    return tablets.some(tablet => isInsideThreeByThreeFootprint(tablet, cell.x, cell.y)) ||
-        itemBoxes.some(box => box.active && isInsideThreeByThreeFootprint(box, cell.x, cell.y)) ||
-        deployedItems.some(item => !item.expired && isInsideThreeByThreeFootprint(item, cell.x, cell.y));
+function rainFeaturesOverlap(first, second) {
+    const secondCells = new Set(second.cells.map(cell => cell.gridY * mapGrid[0].length + cell.gridX));
+    return first.cells.some(cell => secondCells.has(cell.gridY * mapGrid[0].length + cell.gridX));
+}
+
+function overlapsVisibleItem(feature) {
+    return tablets.some(tablet => isInsideRainFeature(tablet, feature)) ||
+        itemBoxes.some(box => box.active && isInsideRainFeature(box, feature)) ||
+        deployedItems.some(item => !item.expired && isInsideRainFeature(item, feature));
 }
 
 function getSecondFloorRoomCells() {
@@ -909,18 +952,20 @@ function initializeAdvancedFloor() {
         };
     }
     if (currentFloor >= 4) {
-        const pavilionCells = openCells.filter(isOpenThreeByThreeCell);
+        const pavilionCells = openCells.map(createRainFeature).filter(Boolean);
         const pavilionCell = getRandomOpenCell(
             pavilionCells.length > 0 ? pavilionCells : openCells,
             [player, centerZone, giraffe, redJade, evilShell]
         );
-        rainSystem.pavilion = { x: pavilionCell.x, y: pavilionCell.y };
+        rainSystem.pavilion = pavilionCell.cells
+            ? pavilionCell
+            : createRainFeature(pavilionCell);
     }
 
     let used = [playerCell, centerCell, giraffeCell];
     if (jadeCell) used.push(jadeCell);
     if (evilShell) used.push(evilShell);
-    if (rainSystem && rainSystem.pavilion) used.push(rainSystem.pavilion);
+    if (rainSystem && rainSystem.pavilion) used.push(...rainSystem.pavilion.cells);
     tablets = [];
     for (let room of secondFloorRooms.filter(room => !(room.left === prisonRoom.left &&
         room.right === prisonRoom.right && room.top === prisonRoom.top && room.bottom === prisonRoom.bottom))) {
@@ -1002,8 +1047,11 @@ function initGame(floor = 1) {
         angle: 0, state: 'PATROL', targetX: 225, targetY: 525,
         sightTimer: 0, lostTimer: 0, lostTargetReached: false, waypointIndex: 0,
         lastSeenX: 225, lastSeenY: 525, lastSeenAngle: 0,
+        lastHeardX: 225, lastHeardY: 525, lastHeardTimer: 0,
+        lastHeardDirectionX: 1, lastHeardDirectionY: 0,
         lostTargetX: 225, lostTargetY: 525,
-        path: [], pathTimer: 0, pathGoalX: -1, pathGoalY: -1, lostSearchIndex: 0, lostPredictionSet: false, searchedRoom: false,
+        path: [], pathTimer: 0, pathGoalX: -1, pathGoalY: -1, lostSearchIndex: 0, lostSearchTargets: null, lostSearchHeading: 0, lostPredictionSet: false, searchedRoom: false,
+        stuckFrames: 0,
         ccTimer: 0, ccType: "", wallPhaseTimer: 0
     };
     giraffeClone = null;
@@ -1087,12 +1135,11 @@ function moveWithWallSlide(entity, moveX, moveY, size) {
             continue;
         }
         let canMoveX = !checkWallCollision(entity.x + stepX, entity.y, size);
-        let canMoveY = !checkWallCollision(entity.x, entity.y + stepY, size);
         if (canMoveX) {
             entity.x += stepX;
             moved = true;
         }
-        if (canMoveY) {
+        if (!checkWallCollision(entity.x, entity.y + stepY, size)) {
             entity.y += stepY;
             moved = true;
         }
@@ -1143,24 +1190,42 @@ function findGiraffePath(sx, sy, ex, ey) {
     let path = findPath(sx, sy, ex, ey, giraffe.size);
     if (path.length > 0 || (sx === ex && sy === ey)) return { path, x: ex, y: ey };
 
-    for (let radius = 1; radius <= 6; radius++) {
-        let candidates = [];
-        for (let y = Math.max(0, ey - radius); y <= Math.min(levelMapRows - 1, ey + radius); y++) {
-            for (let x = Math.max(0, ex - radius); x <= Math.min(mapGrid[0].length - 1, ex + radius); x++) {
-                if (Math.max(Math.abs(x - ex), Math.abs(y - ey)) !== radius ||
-                    checkWallCollision(x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2, giraffe.size)) continue;
-                candidates.push({ x, y, distance: Math.hypot(x - ex, y - ey) });
+    const rows = mapGrid.length, columns = mapGrid[0].length;
+    if (sx < 0 || sx >= columns || sy < 0 || sy >= rows) return { path: [], x: ex, y: ey };
+    const canOccupy = (x, y) => mapGrid[y][x] !== 1 &&
+        !checkWallCollision(x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2, giraffe.size);
+    const queue = [[sx, sy]];
+    const visited = Array(rows).fill().map(() => Array(columns).fill(false));
+    const parent = Array(rows).fill().map(() => Array(columns).fill(null));
+    const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+    visited[sy][sx] = true;
+    let queueIndex = 0, nearest = null;
+
+    while (queueIndex < queue.length) {
+        const [x, y] = queue[queueIndex++];
+        if (canOccupy(x, y)) {
+            const distance = Math.hypot(x - ex, y - ey);
+            if (!nearest || distance < nearest.distance) nearest = { x, y, distance };
+        }
+        for (const [dx, dy] of dirs) {
+            const nextX = x + dx, nextY = y + dy;
+            if (nextX >= 0 && nextX < columns && nextY >= 0 && nextY < rows &&
+                !visited[nextY][nextX] && canOccupy(nextX, nextY)) {
+                visited[nextY][nextX] = true;
+                parent[nextY][nextX] = [x, y];
+                queue.push([nextX, nextY]);
             }
         }
-        candidates.sort((a, b) => a.distance - b.distance);
-        for (let candidate of candidates) {
-            path = sx === candidate.x && sy === candidate.y
-                ? [[sx, sy]]
-                : findPath(sx, sy, candidate.x, candidate.y, giraffe.size);
-            if (path.length > 0) return { path, x: candidate.x, y: candidate.y };
-        }
     }
-    return { path: [], x: ex, y: ey };
+
+    if (!nearest) return { path: [], x: ex, y: ey };
+    path = [];
+    let current = [nearest.x, nearest.y];
+    while (current !== null) {
+        path.push(current);
+        current = parent[current[1]][current[0]];
+    }
+    return { path: path.reverse(), x: nearest.x, y: nearest.y };
 }
 
 function getClearGiraffeTarget(x, y) {
@@ -1172,8 +1237,8 @@ function getClearGiraffeTarget(x, y) {
     let startX = Math.floor(giraffe.x / TILE_SIZE), startY = Math.floor(giraffe.y / TILE_SIZE);
     for (let radius = 0; radius <= 6; radius++) {
         let candidates = [];
-        for (let candidateY = Math.max(0, gridY - radius); candidateY <= Math.min(30, gridY + radius); candidateY++) {
-            for (let candidateX = Math.max(0, gridX - radius); candidateX <= Math.min(40, gridX + radius); candidateX++) {
+        for (let candidateY = Math.max(0, gridY - radius); candidateY <= Math.min(mapGrid.length - 1, gridY + radius); candidateY++) {
+            for (let candidateX = Math.max(0, gridX - radius); candidateX <= Math.min(mapGrid[0].length - 1, gridX + radius); candidateX++) {
                 if (Math.max(Math.abs(candidateX - gridX), Math.abs(candidateY - gridY)) !== radius) continue;
                 let centerX = candidateX * TILE_SIZE + TILE_SIZE / 2;
                 let centerY = candidateY * TILE_SIZE + TILE_SIZE / 2;
@@ -1204,23 +1269,46 @@ function getClearGiraffeTarget(x, y) {
 }
 
 function setNextLostSearchTarget() {
-    const offsets = [[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
-    for (let attempt = 0; attempt < offsets.length; attempt++) {
-        let index = (giraffe.lostSearchIndex + 1) % offsets.length;
-        let [offsetX, offsetY] = offsets[index];
-        let x = giraffe.lostTargetX + offsetX * TILE_SIZE;
-        let y = giraffe.lostTargetY + offsetY * TILE_SIZE;
-        if (x >= giraffe.size && x <= WORLD_WIDTH - giraffe.size &&
-            y >= giraffe.size && y < levelMapRows * TILE_SIZE - giraffe.size &&
-            !checkWallCollision(x, y, giraffe.size)) {
-            giraffe.lostSearchIndex = index;
-            giraffe.targetX = x;
-            giraffe.targetY = y;
-            giraffe.path = [];
-            return true;
+    const rows = mapGrid.length, columns = mapGrid[0].length;
+    const baseGridX = Math.floor(giraffe.lostTargetX / TILE_SIZE);
+    const baseGridY = Math.floor(giraffe.lostTargetY / TILE_SIZE);
+    const maxRing = Math.max(rows, columns);
+    if (!giraffe.lostSearchTargets) {
+        const heading = giraffe.lostSearchHeading;
+        giraffe.lostSearchTargets = [];
+        for (let gridY = 1; gridY < rows - 1; gridY++) {
+            for (let gridX = 1; gridX < columns - 1; gridX++) {
+                const offsetX = gridX - baseGridX;
+                const offsetY = gridY - baseGridY;
+                if (Math.max(Math.abs(offsetX), Math.abs(offsetY)) > maxRing ||
+                    (offsetX === 0 && offsetY === 0) || mapGrid[gridY][gridX] === 1) continue;
+
+                const x = gridX * TILE_SIZE + TILE_SIZE / 2;
+                const y = gridY * TILE_SIZE + TILE_SIZE / 2;
+                if (checkWallCollision(x, y, giraffe.size)) continue;
+
+                const angle = Math.atan2(offsetY, offsetX);
+                const angleDifference = Math.abs(Math.atan2(
+                    Math.sin(angle - heading), Math.cos(angle - heading)
+                ));
+                giraffe.lostSearchTargets.push({
+                    x, y, angleDifference, distance: Math.hypot(offsetX, offsetY)
+                });
+            }
         }
-        giraffe.lostSearchIndex = index;
+        giraffe.lostSearchTargets.sort((a, b) =>
+            a.angleDifference - b.angleDifference || a.distance - b.distance
+        );
     }
+
+    if (giraffe.lostSearchIndex < giraffe.lostSearchTargets.length) {
+        const target = giraffe.lostSearchTargets[giraffe.lostSearchIndex++];
+        giraffe.targetX = target.x;
+        giraffe.targetY = target.y;
+        giraffe.path = [];
+        return true;
+    }
+
     giraffe.targetX = giraffe.lostTargetX;
     giraffe.targetY = giraffe.lostTargetY;
     return false;
@@ -1700,6 +1788,52 @@ function handleMovement() {
     }
 }
 
+function updateGiraffeSoundPrediction(entity, x, y) {
+    if (currentFloor < 4 || entity.state !== 'CHASE') return;
+
+    if (entity.lastHeardTimer > 0) {
+        const dx = x - entity.lastHeardX;
+        const dy = y - entity.lastHeardY;
+        const distance = Math.hypot(dx, dy);
+        if (distance >= TILE_SIZE / 2 && distance <= TILE_SIZE * 10) {
+            entity.lastHeardDirectionX = dx / distance;
+            entity.lastHeardDirectionY = dy / distance;
+        }
+    } else {
+        entity.lastHeardDirectionX = Math.cos(entity.lastSeenAngle);
+        entity.lastHeardDirectionY = Math.sin(entity.lastSeenAngle);
+    }
+
+    entity.lastHeardX = x;
+    entity.lastHeardY = y;
+    entity.lastHeardTimer = 180;
+    const predictionDistance = Math.min(
+        player.speed * 24,
+        TILE_SIZE * 3
+    );
+    let predictedX, predictedY;
+    let adjustedDistance = predictionDistance;
+    do {
+        predictedX = Math.max(entity.size, Math.min(WORLD_WIDTH - entity.size,
+            x + entity.lastHeardDirectionX * adjustedDistance));
+        predictedY = Math.max(entity.size, Math.min(levelMapRows * TILE_SIZE - entity.size,
+            y + entity.lastHeardDirectionY * adjustedDistance));
+        if (!checkWallCollision(predictedX, predictedY, entity.size)) break;
+        adjustedDistance = Math.max(0, adjustedDistance - TILE_SIZE / 2);
+    } while (adjustedDistance > 0);
+    entity.lostTargetX = predictedX;
+    entity.lostTargetY = predictedY;
+    entity.targetX = predictedX;
+    entity.targetY = predictedY;
+    entity.lostSearchIndex = 0;
+    entity.lostSearchTargets = null;
+    entity.lostSearchHeading = Math.atan2(entity.lastHeardDirectionY, entity.lastHeardDirectionX);
+    entity.lostPredictionSet = true;
+    entity.lostTargetReached = false;
+    entity.path = [];
+    entity.pathTimer = 0;
+}
+
 function triggerSound(x, y, maxRadius = 450, gridRange = 0, soundType = 'item') {
     let soundMultiplier = getModeSetting('soundRange');
     let shellSoundSide = 0;
@@ -1750,6 +1884,7 @@ function triggerSound(x, y, maxRadius = 450, gridRange = 0, soundType = 'item') 
     } else {
         canHear = Math.hypot(giraffe.x - x, giraffe.y - y) <= maxRadius;
     }
+    if (canHear && giraffe.ccTimer <= 0) updateGiraffeSoundPrediction(giraffe, x, y);
     if (giraffe.ccTimer <= 0 && giraffe.state !== 'CHASE' && canHear) {
         giraffe.state = 'INVESTIGATE'; giraffe.targetX = x; giraffe.targetY = y; giraffe.path = []; giraffe.searchedRoom = false;
     }
@@ -1776,6 +1911,9 @@ function triggerSound(x, y, maxRadius = 450, gridRange = 0, soundType = 'item') 
                 Math.abs(giraffeClone.y - y) <= gridRange * TILE_SIZE;
         } else {
             cloneCanHear = Math.hypot(giraffeClone.x - x, giraffeClone.y - y) <= maxRadius;
+        }
+        if (cloneCanHear && giraffeClone.ccTimer <= 0) {
+            updateGiraffeSoundPrediction(giraffeClone, x, y);
         }
         if (cloneCanHear) {
             giraffeClone.state = 'INVESTIGATE';
@@ -1832,10 +1970,12 @@ function createGiraffeClone() {
         state: 'PATROL',
         sightTimer: 0,
         lostTimer: 0,
+        lastHeardTimer: 0,
         path: [],
         pathTimer: 0,
         pathGoalX: -1,
         pathGoalY: -1,
+        stuckFrames: 0,
         ccTimer: 0,
         ccType: '',
         wallPhaseTimer: 0
@@ -1866,7 +2006,35 @@ function getActiveGiraffes() {
     return giraffeClone ? [giraffe, giraffeClone] : [giraffe];
 }
 
+function recoverStuckGiraffe(entity) {
+    const safeCells = getOpenCells().filter(cell =>
+        !checkWallCollision(cell.x, cell.y, entity.size));
+    if (safeCells.length === 0) return false;
+
+    const currentGridX = Math.floor(entity.x / TILE_SIZE);
+    const currentGridY = Math.floor(entity.y / TILE_SIZE);
+    const currentCell = safeCells.find(cell =>
+        cell.gridX === currentGridX && cell.gridY === currentGridY);
+    const escapeCells = safeCells.filter(cell =>
+        Math.abs(cell.gridX - currentGridX) + Math.abs(cell.gridY - currentGridY) === 1);
+    escapeCells.sort((a, b) =>
+        Math.hypot(a.x - entity.targetX, a.y - entity.targetY) -
+        Math.hypot(b.x - entity.targetX, b.y - entity.targetY));
+
+    const recoveryCell = escapeCells[0] || currentCell ||
+        getNearestOpenCell(entity.x, entity.y, safeCells);
+    entity.x = recoveryCell.x;
+    entity.y = recoveryCell.y;
+    entity.path = [];
+    entity.pathTimer = 0;
+    entity.pathGoalX = -1;
+    entity.pathGoalY = -1;
+    entity.stuckFrames = 0;
+    return true;
+}
+
 function updateGiraffeAI() {
+    if (giraffe.lastHeardTimer > 0) giraffe.lastHeardTimer--;
     if (giraffe.wallPhaseTimer > 0) {
         giraffe.wallPhaseTimer--;
         if (giraffe.wallPhaseTimer === 0) moveGiraffeToSafeCell(giraffe);
@@ -1903,7 +2071,7 @@ function updateGiraffeAI() {
     if (canSeePlayer) {
         giraffe.lastSeenX = player.x;
         giraffe.lastSeenY = player.y;
-        giraffe.lastSeenAngle = player.angle;
+        if (player.isMoving) giraffe.lastSeenAngle = player.angle;
         giraffe.lostPredictionSet = false;
         if (giraffe.state === 'CHASE') {
             giraffe.lostTimer = 0;
@@ -1919,30 +2087,40 @@ function updateGiraffeAI() {
         giraffe.sightTimer = Math.max(0, giraffe.sightTimer - 1/60);
         if (giraffe.state === 'CHASE') {
             giraffe.lostTimer += 1 / 60;
-            if (Math.hypot(player.x - giraffe.x, player.y - giraffe.y) <= 275 && !isPlayerHidden) {
+            if (currentFloor < 4 &&
+                Math.hypot(player.x - giraffe.x, player.y - giraffe.y) <= 275 && !isPlayerHidden) {
                 let target = getClearGiraffeTarget(player.x, player.y);
                 giraffe.lostTargetX = player.x;
                 giraffe.lostTargetY = player.y;
                 giraffe.targetX = target.x;
                 giraffe.targetY = target.y;
                 giraffe.lostTimer = 0;
+                giraffe.lostSearchIndex = 0;
+                giraffe.lostSearchTargets = null;
+                giraffe.lostSearchHeading = giraffe.lastSeenAngle;
                 giraffe.lostTargetReached = true;
             } else if (!giraffe.lostTargetReached) {
                 if (!giraffe.lostPredictionSet) {
-                    let predictionDistance = Math.min(player.speed * 15, TILE_SIZE);
+                    let predictionDistance = currentFloor >= 4
+                        ? Math.min(player.speed * 24, TILE_SIZE * 3)
+                        : Math.min(player.speed * 15, TILE_SIZE);
                     let predictedX, predictedY;
                     do {
-                        predictedX = Math.max(player.size, Math.min(WORLD_WIDTH - player.size,
+                        predictedX = Math.max(giraffe.size, Math.min(WORLD_WIDTH - giraffe.size,
                             giraffe.lastSeenX + Math.cos(giraffe.lastSeenAngle) * predictionDistance));
-                        predictedY = Math.max(player.size, Math.min(WORLD_HEIGHT - player.size,
+                        predictedY = Math.max(giraffe.size, Math.min(WORLD_HEIGHT - giraffe.size,
                             giraffe.lastSeenY + Math.sin(giraffe.lastSeenAngle) * predictionDistance));
                         if (!checkWallCollision(predictedX, predictedY, giraffe.size)) break;
                         predictionDistance = Math.max(0, predictionDistance - TILE_SIZE / 2);
                     } while (predictionDistance > 0);
-                    let predictedTarget = getClearGiraffeTarget(predictedX, predictedY);
+                    let predictedTarget = currentFloor >= 4
+                        ? { x: predictedX, y: predictedY }
+                        : getClearGiraffeTarget(predictedX, predictedY);
                     giraffe.lostTargetX = predictedTarget.x;
                     giraffe.lostTargetY = predictedTarget.y;
                     giraffe.lostSearchIndex = 0;
+                    giraffe.lostSearchTargets = null;
+                    giraffe.lostSearchHeading = giraffe.lastSeenAngle;
                     giraffe.lostPredictionSet = true;
                 }
                 giraffe.targetX = giraffe.lostTargetX;
@@ -1995,14 +2173,14 @@ function updateGiraffeAI() {
     giraffe.pathTimer++;
     let pathGoalX = Math.floor(giraffe.targetX / TILE_SIZE);
     let pathGoalY = Math.floor(giraffe.targetY / TILE_SIZE);
-    if (!canPassWalls && (giraffe.pathTimer % 15 === 0 || giraffe.path.length === 0 ||
+    if (!canPassWalls && (giraffe.path.length === 0 ||
         pathGoalX !== giraffe.pathGoalX || pathGoalY !== giraffe.pathGoalY)) {
         let route = findGiraffePath(Math.floor(giraffe.x/TILE_SIZE), Math.floor(giraffe.y/TILE_SIZE), pathGoalX, pathGoalY);
         giraffe.path = route.path;
         if (route.path.length > 0 && (route.x !== pathGoalX || route.y !== pathGoalY)) {
             giraffe.targetX = route.x * TILE_SIZE + TILE_SIZE / 2;
             giraffe.targetY = route.y * TILE_SIZE + TILE_SIZE / 2;
-            if (giraffe.state === 'CHASE' && !canSeePlayer) {
+            if (giraffe.state === 'CHASE' && !canSeePlayer && !giraffe.lostTargetReached) {
                 giraffe.lostTargetX = giraffe.targetX;
                 giraffe.lostTargetY = giraffe.targetY;
             }
@@ -2052,7 +2230,9 @@ function updateGiraffeAI() {
 
     let deltaX = nextX - giraffe.x, deltaY = nextY - giraffe.y;
     let distance = Math.hypot(deltaX, deltaY);
-    let moved = false;
+    const wasStuck = giraffe.stuckFrames > 0;
+    const needsMovement =
+        Math.hypot(giraffe.targetX - giraffe.x, giraffe.targetY - giraffe.y) > 25;
     if (distance > 0) {
         currentSpeed *= getModeSetting('monsterSpeed');
         let stepX = (deltaX / distance) * Math.min(currentSpeed, distance);
@@ -2061,22 +2241,28 @@ function updateGiraffeAI() {
         if (canPassWalls) {
             giraffe.x += stepX;
             giraffe.y += stepY;
-            moved = true;
         } else {
-            if (Math.abs(stepX) > 0.001 && !checkWallCollision(giraffe.x + stepX, giraffe.y, giraffe.size)) {
-                giraffe.x += stepX;
-                moved = true;
-            }
-            if (Math.abs(stepY) > 0.001 && !checkWallCollision(giraffe.x, giraffe.y + stepY, giraffe.size)) {
-                giraffe.y += stepY;
-                moved = true;
-            }
+            moveWithWallSlide(giraffe, stepX, stepY, giraffe.size);
         }
-        if (!moved) {
+        const remainingDistance = Math.hypot(nextX - giraffe.x, nextY - giraffe.y);
+        if (distance > 2 && remainingDistance >= distance - 0.05) {
+            giraffe.stuckFrames = (giraffe.stuckFrames || 0) + 1;
             giraffe.path = [];
             giraffe.pathGoalX = -1;
             giraffe.pathGoalY = -1;
+            if (giraffe.stuckFrames >= 30 && !canPassWalls) {
+                recoverStuckGiraffe(giraffe);
+            }
+        } else {
+            giraffe.stuckFrames = 0;
         }
+    } else if (needsMovement && !canPassWalls) {
+        giraffe.stuckFrames++;
+        if (giraffe.stuckFrames >= 30) {
+            recoverStuckGiraffe(giraffe);
+        }
+    } else if (wasStuck) {
+        giraffe.stuckFrames = 0;
     }
 
     let txt = "常態巡邏中 🌲";
@@ -2153,30 +2339,31 @@ function getReachableOpenCellsFromPlayer() {
 }
 
 function spawnRainPuddle() {
-    const candidates = getReachableOpenCellsFromPlayer().filter(cell =>
-        isOpenThreeByThreeCell(cell) &&
-        !isInsideThreeByThreeFootprint(player, cell.x, cell.y) &&
-        rainSystem.puddles.every(puddle => !footprintsOverlapThreeByThree(cell, puddle)) &&
-        !overlapsVisibleItem(cell) &&
-        (!rainSystem.pavilion || !footprintsOverlapThreeByThree(cell, rainSystem.pavilion)));
+    const candidates = getReachableOpenCellsFromPlayer().map(createRainFeature).filter(feature =>
+        feature &&
+        !isInsideRainFeature(player, feature) &&
+        rainSystem.puddles.every(puddle => !rainFeaturesOverlap(feature, puddle)) &&
+        !overlapsVisibleItem(feature) &&
+        (!rainSystem.pavilion || !rainFeaturesOverlap(feature, rainSystem.pavilion)));
     if (candidates.length === 0) return;
     const cell = candidates[Math.floor(Math.random() * candidates.length)];
-    rainSystem.puddles.push({ x: cell.x, y: cell.y, timer: 30 * 60 });
+    rainSystem.puddles.push({ x: cell.x, y: cell.y, cells: cell.cells, timer: 30 * 60 });
 }
 
 function refreshMathRainPavilion() {
     const reachableCells = getReachableOpenCellsFromPlayer();
     const previous = rainSystem.pavilion;
-    const openCells = reachableCells.filter(cell =>
-        isOpenThreeByThreeCell(cell) &&
-        rainSystem.puddles.every(puddle => !footprintsOverlapThreeByThree(cell, puddle)) &&
-        !overlapsVisibleItem(cell));
-    const candidates = openCells.filter(cell =>
+    const candidates = reachableCells.map(createRainFeature).filter(feature =>
+        feature &&
+        !isInsideRainFeature(player, feature) &&
+        rainSystem.puddles.every(puddle => !rainFeaturesOverlap(feature, puddle)) &&
+        !overlapsVisibleItem(feature) &&
+        (!previous || !rainFeaturesOverlap(feature, previous)));
+    const distantCandidates = candidates.filter(cell =>
         !previous || Math.hypot(cell.x - previous.x, cell.y - previous.y) >= TILE_SIZE * 5);
-    const pool = candidates.length > 0 ? candidates : openCells;
+    const pool = distantCandidates.length > 0 ? distantCandidates : candidates;
     if (pool.length > 0) {
-        const cell = pool[Math.floor(Math.random() * pool.length)];
-        rainSystem.pavilion = { x: cell.x, y: cell.y };
+        rainSystem.pavilion = pool[Math.floor(Math.random() * pool.length)];
         rainSystem.pavilionOccupied = false;
     }
     rainSystem.pavilionTick = 0;
@@ -2216,7 +2403,7 @@ function updateRainSystem() {
         if (puddle.timer <= 0) {
             rainSystem.puddles.splice(index, 1);
             rainSystem.progress = Math.min(100, rainSystem.progress + 4);
-        } else if (!player.inPrison && isInsideThreeByThreeFootprint(player, puddle.x, puddle.y)) {
+        } else if (!player.inPrison && isInsideRainFeature(player, puddle)) {
             rainSystem.puddles.splice(index, 1);
             rainSystem.progress = Math.min(100, rainSystem.progress + 2);
             triggerSound(puddle.x, puddle.y, 0, 10 + currentFloor * 10, 'puddle');
@@ -2224,7 +2411,7 @@ function updateRainSystem() {
     }
 
     const atPavilion = rainSystem.pavilion && !player.inPrison &&
-        isInsideThreeByThreeFootprint(player, rainSystem.pavilion.x, rainSystem.pavilion.y);
+        isInsideRainFeature(player, rainSystem.pavilion);
     if (!atPavilion) {
         rainSystem.pavilionOccupied = false;
     } else if (!rainSystem.pavilionOccupied) {
@@ -2236,6 +2423,7 @@ function updateRainSystem() {
             showNotice('數學雨亭生效！雨停了，下雨進度歸零。');
         } else {
             activateMathPavilionCurse();
+            refreshMathRainPavilion();
         }
     }
 
@@ -2507,12 +2695,14 @@ function draw() {
     if (rainSystem) {
         rainSystem.puddles.forEach(puddle => {
             ctx.save();
-            const puddleSize = TILE_SIZE * 3;
             ctx.fillStyle = 'rgba(3, 169, 244, 0.35)';
             ctx.strokeStyle = 'rgba(128, 222, 234, 0.9)';
             ctx.lineWidth = 2;
-            ctx.fillRect(puddle.x - puddleSize / 2, puddle.y - puddleSize / 2, puddleSize, puddleSize);
-            ctx.strokeRect(puddle.x - puddleSize / 2, puddle.y - puddleSize / 2, puddleSize, puddleSize);
+            puddle.cells.forEach(cell => {
+                const x = cell.gridX * TILE_SIZE, y = cell.gridY * TILE_SIZE;
+                ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+            });
             ctx.strokeStyle = 'rgba(255,255,255,0.55)';
             ctx.beginPath();
             ctx.ellipse(puddle.x, puddle.y, 24, 12, -0.25, 0, Math.PI * 2);
@@ -2524,14 +2714,14 @@ function draw() {
             ctx.save();
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            const pavilionSize = TILE_SIZE * 3;
             ctx.fillStyle = 'rgba(0, 96, 100, 0.38)';
             ctx.strokeStyle = 'rgba(128, 222, 234, 0.95)';
             ctx.lineWidth = 3;
-            ctx.fillRect(rainSystem.pavilion.x - pavilionSize / 2,
-                rainSystem.pavilion.y - pavilionSize / 2, pavilionSize, pavilionSize);
-            ctx.strokeRect(rainSystem.pavilion.x - pavilionSize / 2,
-                rainSystem.pavilion.y - pavilionSize / 2, pavilionSize, pavilionSize);
+            rainSystem.pavilion.cells.forEach(cell => {
+                const x = cell.gridX * TILE_SIZE, y = cell.gridY * TILE_SIZE;
+                ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+            });
             ctx.font = '42px Arial';
             ctx.shadowBlur = 12;
             ctx.shadowColor = '#80deea';
@@ -2740,7 +2930,7 @@ function draw() {
         if (currentFloor >= 4) {
             ctx.fillStyle = '#80deea';
             ctx.fillText('🌧 下雨進度每秒增加 1%；滿 100% 開始下雨。', prisonRoom.x, enemyTextY);
-            ctx.fillText('雨中每秒減少 4%，水坑踩到發出大範圍聲音。', prisonRoom.x, enemyTextY + 20);
+            ctx.fillText('雨中每秒減少 2%，水坑踩到發出大範圍聲音。', prisonRoom.x, enemyTextY + 20);
             ctx.fillText('🏕️ 數學雨亭每 20 秒換位；下雨時碰到可停雨。', prisonRoom.x, enemyTextY + 40);
         }
         ctx.textAlign = 'center';
